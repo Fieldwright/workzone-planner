@@ -3521,12 +3521,14 @@ function updateARDisplay(){
   
   const screenWidth = window.innerWidth;
   const screenHeight = window.innerHeight;
-  const fovHorizontal = 70;
-  const fovVertical = 50;
+  const fovHorizontal = 90; // Wider FOV for better visibility
+  const fovVertical = 70;
   
   const eyeHeight = 5;
   
   let devicesRendered = 0;
+  let devicesInRange = 0;
+  let devicesInFOV = 0;
   
   fieldDevices.forEach((device, idx) => {
     const deviceLat = device.a || device.lat;
@@ -3540,7 +3542,9 @@ function updateARDisplay(){
     const distM = turf.distance(userPt, devicePt, {units: 'meters'});
     const distFt = distM / FT_TO_M;
     
-    if (distFt > 200) return;
+    // Increased range to 2000 feet
+    if (distFt > 2000) return;
+    devicesInRange++;
     
     const bearing = turf.bearing(userPt, devicePt);
     
@@ -3550,24 +3554,40 @@ function updateARDisplay(){
     
     const halfFovH = fovHorizontal / 2;
     if (Math.abs(relativeBearing) > halfFovH) return;
+    devicesInFOV++;
     
     const xPercent = relativeBearing / fovHorizontal;
     const xPos = (screenWidth / 2) + (xPercent * screenWidth);
     
-    const pitchDeg = Math.max(30, Math.min(90, devicePitch));
+    // Better vertical positioning for long distances
+    const pitchDeg = Math.max(20, Math.min(90, devicePitch));
     const distanceToDevice = Math.max(distFt, 1);
     
+    // Improved ground plane calculation for distant objects
     const angleToGround = Math.atan(eyeHeight / distanceToDevice) * (180 / Math.PI);
     const cameraLookAngle = 90 - pitchDeg;
     const objectAngleFromCenter = cameraLookAngle - angleToGround;
     const yPercent = objectAngleFromCenter / fovVertical;
     const yPos = (screenHeight / 2) - (yPercent * screenHeight);
     
-    if (yPos < -100 || yPos > screenHeight + 100) return;
+    // More lenient vertical bounds for distant objects
+    if (yPos < -200 || yPos > screenHeight + 200) return;
     
-    const baseScale = 1.0;
-    const scaleFactor = (100 / Math.max(distFt, 5)) * baseScale;
-    const scale = Math.max(0.3, Math.min(scaleFactor, 2.5));
+    // Dynamic scaling based on distance - larger range
+    const baseScale = 1.2;
+    let scaleFactor;
+    
+    if (distFt < 50) {
+      scaleFactor = (50 / Math.max(distFt, 5)) * baseScale;
+    } else if (distFt < 200) {
+      scaleFactor = (100 / distFt) * baseScale;
+    } else if (distFt < 500) {
+      scaleFactor = (150 / distFt) * baseScale;
+    } else {
+      scaleFactor = (200 / distFt) * baseScale;
+    }
+    
+    const scale = Math.max(0.2, Math.min(scaleFactor, 3));
     
     const deviceDiv = document.createElement('div');
     deviceDiv.className = 'ar-device';
@@ -3584,9 +3604,10 @@ function updateARDisplay(){
     deviceDiv.style.left = `${xPos}px`;
     deviceDiv.style.top = `${yPos}px`;
     deviceDiv.style.transform = `translate(-50%, -100%) scale(${scale})`;
-    deviceDiv.style.zIndex = Math.round(1000 - distFt);
+    deviceDiv.style.zIndex = Math.round(10000 - distFt); // Higher base z-index
     
-    const showDist = distFt >= 5;
+    // Always show distance label for AR
+    const distLabel = distFt < 1000 ? `${Math.round(distFt)}ft` : `${(distFt/1000).toFixed(1)}k ft`;
     
     if (isCone){
       deviceDiv.innerHTML = `
@@ -3595,7 +3616,7 @@ function updateARDisplay(){
           <div class="cone-base-3d"></div>
           <div class="cone-body"></div>
           <div class="cone-stripe"></div>
-          ${showDist ? `<div class="ar-device-label">${Math.round(distFt)}ft</div>` : ''}
+          <div class="ar-device-label">${distLabel}</div>
         </div>
       `;
     } else {
@@ -3604,7 +3625,7 @@ function updateARDisplay(){
           <div class="sign-shadow"></div>
           <div class="sign-post"></div>
           <div class="sign-panel">🚸</div>
-          ${showDist ? `<div class="ar-device-label">${Math.round(distFt)}ft</div>` : ''}
+          <div class="ar-device-label">${distLabel}</div>
         </div>
       `;
     }
@@ -3626,14 +3647,16 @@ function updateARDisplay(){
   
   const bearing = turf.bearing(userPt, devicePt);
   
-  document.getElementById('arDistance').textContent = `${distFt} ft`;
+  // Show distance in appropriate units
+  const distDisplay = distFt < 1000 ? `${distFt} ft` : `${(distFt/1000).toFixed(1)}k ft`;
+  document.getElementById('arDistance').textContent = distDisplay;
   
   let relativeBearing = bearing - deviceOrientation;
   if (relativeBearing < -180) relativeBearing += 360;
   if (relativeBearing > 180) relativeBearing -= 360;
   
   const dirText = getARDirectionText(relativeBearing, distFt);
-  document.getElementById('arDirection').innerHTML = `${dirText}<br><span style="font-size:10px;opacity:0.7">${devicesRendered} devices visible</span>`;
+  document.getElementById('arDirection').innerHTML = `${dirText}<br><span style="font-size:9px;opacity:0.7">${devicesRendered} visible • ${devicesInRange} in range • ${devicesInFOV} in view</span>`;
   
   const arrow = document.getElementById('arArrow');
   arrow.style.transform = `rotate(${relativeBearing}deg)`;
@@ -3656,9 +3679,10 @@ function updateARDisplay(){
     arrow.style.opacity = '0.6';
   }
   
-  if (devicesRendered === 0) {
-    console.log('AR Debug: No devices rendered. Total devices:', fieldDevices.length);
-    console.log('User position:', userLL.lat, userLL.lng);
+  // Debug logging
+  if (devicesRendered === 0 && devicesInRange > 0) {
+    console.log('AR Debug: Devices in range but not rendering');
+    console.log('In range:', devicesInRange, 'In FOV:', devicesInFOV, 'Rendered:', devicesRendered);
     console.log('Device orientation:', deviceOrientation, 'Pitch:', devicePitch);
   }
 }
