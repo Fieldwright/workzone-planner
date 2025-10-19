@@ -136,11 +136,26 @@
   
   .field-controls{background:var(--panel);padding:10px;border-top:1px solid #1f2937;display:flex;gap:8px;flex-wrap:wrap}
   .field-controls button{flex:1;min-width:120px}
+  .field-legend{display:flex;gap:12px;justify-content:center;padding:6px;font-size:11px;color:var(--muted);flex-basis:100%;border-top:1px solid #374151;margin-top:4px;padding-top:8px}
+  .field-legend-item{display:flex;align-items:center;gap:4px}
+  .field-legend-dot{width:12px;height:12px;border-radius:50%;border:2px solid #000}
   .device-popup{font-size:13px;line-height:1.5}
   .device-popup strong{color:var(--accent);display:block;margin-bottom:4px;font-size:14px}
   .device-popup .coord{color:var(--muted);font-size:11px;font-family:monospace}
   .placement-marker{background:var(--success);color:#000;padding:4px 8px;border-radius:6px;font-weight:bold;font-size:11px;border:2px solid #000;box-shadow:0 2px 4px rgba(0,0,0,0.3)}
   .placement-marker.placed{background:#6b7280;opacity:0.5}
+  
+  /* Improved field markers */
+  .field-cone{width:32px;height:32px;background:#ff6a00;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:bold;font-size:14px;color:#fff;border:3px solid #000;box-shadow:0 2px 6px rgba(0,0,0,0.5);position:relative}
+  .field-cone.placed{background:#6b7280;opacity:0.6}
+  .field-cone::after{content:attr(data-num);position:absolute;bottom:-2px;right:-2px;background:#000;color:#fff;border-radius:50%;width:16px;height:16px;font-size:10px;display:flex;align-items:center;justify-content:center;border:2px solid #fff}
+  
+  .field-sign{width:36px;height:36px;background:#facc15;border-radius:4px;display:flex;align-items:center;justify-content:center;font-weight:bold;font-size:18px;border:3px solid #000;box-shadow:0 2px 6px rgba(0,0,0,0.5);position:relative}
+  .field-sign.placed{background:#6b7280;opacity:0.6}
+  .field-sign::after{content:attr(data-num);position:absolute;bottom:-2px;right:-2px;background:#000;color:#fff;border-radius:50%;width:16px;height:16px;font-size:10px;display:flex;align-items:center;justify-content:center;border:2px solid #fff}
+  
+  .field-taper{background:#22c55e}
+  .field-buffer{background:#f59e0b}
   
   /* Arrival notification */
   .arrival-banner{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:var(--success);color:#000;padding:20px 30px;border-radius:12px;font-size:20px;font-weight:bold;z-index:2000;box-shadow:0 8px 24px rgba(0,0,0,0.5);animation:popIn 0.3s ease;border:4px solid #fff}
@@ -399,6 +414,24 @@
     <button id="btnLocateMe" class="secondary">📍 Start GPS</button>
     <button id="btnNextDevice" style="background:var(--accent)">→ Next Device</button>
     <button id="btnExitField" class="secondary">Exit Setup</button>
+    <div class="field-legend">
+      <div class="field-legend-item">
+        <div class="field-legend-dot" style="background:#22c55e"></div>
+        <span>Taper</span>
+      </div>
+      <div class="field-legend-item">
+        <div class="field-legend-dot" style="background:#f59e0b"></div>
+        <span>Buffer</span>
+      </div>
+      <div class="field-legend-item">
+        <div class="field-legend-dot" style="background:#facc15"></div>
+        <span>Sign</span>
+      </div>
+      <div class="field-legend-item">
+        <div class="field-legend-dot" style="background:#6b7280"></div>
+        <span>Placed</span>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -1464,12 +1497,23 @@ function initFieldView(data){
       const placed = device.p !== undefined ? device.p : (device.placed || false);
       
       const isCone = deviceType === 'c' || deviceType === 'cone';
+      const isTaper = deviceName.toLowerCase().includes('taper');
+      const isBuffer = deviceName.toLowerCase().includes('buffer');
+      
+      // Determine color class
+      let colorClass = '';
+      if (isCone) {
+        if (isTaper) colorClass = 'field-taper';
+        else if (isBuffer) colorClass = 'field-buffer';
+      }
+      
       const icon = L.divIcon({
         className: '',
-        html: `<div class="placement-marker ${placed ? 'placed' : ''}" data-index="${idx}">
-          ${isCone ? '🚧' : '🚸'} ${deviceName}
+        html: `<div class="${isCone ? 'field-cone' : 'field-sign'} ${colorClass} ${placed ? 'placed' : ''}" data-num="${idx + 1}">
+          ${isCone ? '🚧' : '🚸'}
         </div>`,
-        iconSize: [0, 0]
+        iconSize: [36, 36],
+        iconAnchor: [18, 18]
       });
       
       const marker = L.marker([lat, lng], {icon});
