@@ -194,6 +194,38 @@
   .arrival-banner{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:var(--success);color:#000;padding:20px 30px;border-radius:12px;font-size:20px;font-weight:bold;z-index:2000;box-shadow:0 8px 24px rgba(0,0,0,0.5);animation:popIn 0.3s ease;border:4px solid #fff}
   @keyframes popIn{from{transform:translate(-50%,-50%) scale(0.5);opacity:0} to{transform:translate(-50%,-50%) scale(1);opacity:1}}
 
+  /* AR Mode */
+  #arView{display:none;position:absolute;top:0;left:0;right:0;bottom:0;z-index:1500;background:#000}
+  #arView.active{display:flex;flex-direction:column}
+  #arCamera{width:100%;height:100%;object-fit:cover}
+  .ar-overlay{position:absolute;top:0;left:0;right:0;bottom:0;pointer-events:none}
+  .ar-hud{position:absolute;top:20px;left:50%;transform:translateX(-50%);background:rgba(17,24,39,0.9);padding:12px 20px;border-radius:12px;border:2px solid var(--accent);color:var(--text);text-align:center;font-weight:bold;backdrop-filter:blur(10px)}
+  .ar-distance{font-size:32px;color:var(--accent);line-height:1}
+  .ar-direction{font-size:14px;margin-top:4px;color:var(--muted)}
+  .ar-arrow{position:absolute;top:50%;left:50%;width:80px;height:80px;margin-left:-40px;margin-top:-40px;transition:transform 0.3s ease}
+  .ar-arrow svg{width:100%;height:100%;filter:drop-shadow(0 4px 8px rgba(0,0,0,0.5))}
+  .ar-reticle{position:absolute;top:50%;left:50%;width:60px;height:60px;margin-left:-30px;margin-top:-30px;border:3px solid var(--accent);border-radius:50%;animation:pulse 1.5s ease-in-out infinite}
+  @keyframes pulse{0%,100%{transform:scale(1);opacity:0.6} 50%{transform:scale(1.2);opacity:1}}
+  
+  /* AR Device Icons */
+  .ar-device{position:absolute;transition:all 0.2s ease;filter:drop-shadow(0 4px 8px rgba(0,0,0,0.8));pointer-events:none}
+  .ar-device.current{animation:highlight 1s ease-in-out infinite}
+  @keyframes highlight{0%,100%{filter:drop-shadow(0 4px 12px rgba(96,165,250,1))} 50%{filter:drop-shadow(0 4px 20px rgba(96,165,250,0.5))}}
+  .ar-cone-icon{width:40px;height:50px;position:relative}
+  .ar-cone-shape{width:0;height:0;border-left:20px solid transparent;border-right:20px solid transparent;border-bottom:40px solid #ff6a00;position:absolute;bottom:5px;left:0;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.5))}
+  .ar-cone-base{width:30px;height:8px;background:#7a2d00;border-radius:4px;position:absolute;bottom:0;left:5px}
+  .ar-sign-icon{width:40px;height:40px;background:#facc15;border:3px solid #000;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:24px;box-shadow:0 4px 8px rgba(0,0,0,0.5)}
+  .ar-device-label{position:absolute;bottom:-20px;left:50%;transform:translateX(-50%);background:rgba(17,24,39,0.9);color:#fff;padding:2px 6px;border-radius:4px;font-size:10px;white-space:nowrap;font-weight:bold}
+  .ar-device.placed{opacity:0.3}
+  .ar-device.taper .ar-cone-shape{border-bottom-color:#22c55e}
+  .ar-device.buffer .ar-cone-shape{border-bottom-color:#f59e0b}
+  
+  .ar-snap{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:var(--success);color:#000;padding:24px 40px;border-radius:16px;font-size:24px;font-weight:bold;border:4px solid #fff;box-shadow:0 8px 24px rgba(0,0,0,0.8);animation:snapPulse 0.5s ease}
+  @keyframes snapPulse{0%,100%{transform:translate(-50%,-50%) scale(1)} 50%{transform:translate(-50%,-50%) scale(1.1)}}
+  .ar-controls{position:absolute;bottom:20px;left:50%;transform:translateX(-50%);display:flex;gap:12px}
+  .ar-controls button{padding:12px 24px;border-radius:12px;border:2px solid var(--accent);background:rgba(17,24,39,0.9);color:var(--text);font-weight:bold;font-size:14px;cursor:pointer;backdrop-filter:blur(10px)}
+  .ar-controls button:active{background:var(--accent);color:#000}
+
   /* QR Preview Modal */
   .modal{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.8);z-index:9999;align-items:center;justify-content:center}
   .modal.active{display:flex}
@@ -473,6 +505,7 @@
   </div>
   <div class="field-controls">
     <button id="btnLocateMe" class="secondary">📍 Start GPS</button>
+    <button id="btnARMode" class="secondary">📷 AR Mode</button>
     <button id="btnNextDevice" style="background:var(--accent)">→ Next Device</button>
     <button id="btnExitField" class="secondary">Exit Setup</button>
     <div class="field-legend">
@@ -493,9 +526,40 @@
         <span>Placed</span>
       </div>
       <div style="flex-basis:100%;text-align:center;font-size:10px;color:var(--muted);margin-top:4px">
-        💡 Use filter buttons above to focus on one device type at a time<br>
-        🔊 Audio alerts play when you arrive at each device (within 10 ft)
+        💡 Use filter buttons to focus on device types<br>
+        🔊 Audio alerts play when you arrive (within 10 ft)<br>
+        📷 AR Mode shows live camera with directional guidance
       </div>
+    </div>
+  </div>
+  
+  <!-- AR View -->
+  <div id="arView">
+    <video id="arCamera" autoplay playsinline></video>
+    <div class="ar-overlay">
+      <div class="ar-hud">
+        <div class="ar-distance" id="arDistance">—</div>
+        <div class="ar-direction" id="arDirection">Initializing...</div>
+      </div>
+      <div id="arDeviceContainer"></div>
+      <div class="ar-reticle"></div>
+      <div class="ar-arrow" id="arArrow">
+        <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="arrowGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+              <stop offset="0%" style="stop-color:#22c55e;stop-opacity:1" />
+              <stop offset="100%" style="stop-color:#10b981;stop-opacity:1" />
+            </linearGradient>
+          </defs>
+          <path d="M 50 10 L 70 40 L 58 40 L 58 90 L 42 90 L 42 40 L 30 40 Z" 
+                fill="url(#arrowGrad)" stroke="#fff" stroke-width="2"/>
+        </svg>
+      </div>
+      <div id="arSnap" class="ar-snap" style="display:none">✓ PERFECT!</div>
+    </div>
+    <div class="ar-controls">
+      <button id="btnARPlace">✓ Place Here</button>
+      <button id="btnARClose">Exit AR</button>
     </div>
   </div>
 </div>
@@ -1592,6 +1656,10 @@ let userHeading = 0;
 let lastArrivalAlert = 0;
 let activeFilter = 'all'; // Current device filter
 let audioContext = null; // Audio context for sounds
+let arActive = false;
+let arStream = null;
+let arUpdateInterval = null;
+let deviceOrientation = 0;
 
 // Initialize Web Audio API for sounds
 function initAudio(){
@@ -1804,17 +1872,314 @@ function initFieldView(data){
   
   // Setup controls
   document.getElementById('btnLocateMe').addEventListener('click', startGPSTracking);
+  document.getElementById('btnARMode').addEventListener('click', toggleARMode);
   document.getElementById('btnNextDevice').addEventListener('click', nextDevice);
   document.getElementById('btnExitField').addEventListener('click', () => {
     stopGPSTracking();
+    if (arActive) stopARMode();
     window.location.hash = '';
     window.location.reload();
   });
+  
+  // AR controls
+  document.getElementById('btnARClose').addEventListener('click', stopARMode);
+  document.getElementById('btnARPlace').addEventListener('click', placeFromAR);
   
   // Device orientation for compass (if available)
   if (window.DeviceOrientationEvent){
     window.addEventListener('deviceorientation', handleOrientation);
   }
+}
+
+// ============== AR MODE ==============
+
+async function toggleARMode(){
+  if (arActive){
+    stopARMode();
+  } else {
+    await startARMode();
+  }
+}
+
+async function startARMode(){
+  if (currentDeviceIndex < 0 || currentDeviceIndex >= fieldDevices.length){
+    alert('Please select a device first using "Next Device"');
+    return;
+  }
+  
+  const device = fieldDevices[currentDeviceIndex];
+  const placed = device.p !== undefined ? device.p : (device.placed || false);
+  if (placed){
+    alert('This device is already placed. Use "Next Device" to find the next one.');
+    return;
+  }
+  
+  // Make sure GPS is active
+  if (!userMarker){
+    alert('Please start GPS tracking first (📍 Start GPS button)');
+    return;
+  }
+  
+  try {
+    // Request camera access
+    arStream = await navigator.mediaDevices.getUserMedia({
+      video: { 
+        facingMode: 'environment', // Use back camera
+        width: { ideal: 1920 },
+        height: { ideal: 1080 }
+      }
+    });
+    
+    const video = document.getElementById('arCamera');
+    video.srcObject = arStream;
+    
+    // Show AR view
+    document.getElementById('arView').classList.add('active');
+    arActive = true;
+    
+    // Update AR display continuously
+    arUpdateInterval = setInterval(updateARDisplay, 100);
+    
+    // Request device orientation permission on iOS
+    if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function'){
+      try {
+        const permission = await DeviceOrientationEvent.requestPermission();
+        if (permission !== 'granted'){
+          alert('Device orientation permission needed for AR mode');
+        }
+      } catch (e){
+        console.error('Orientation permission error:', e);
+      }
+    }
+    
+  } catch (error){
+    console.error('Camera access error:', error);
+    alert('Could not access camera. Make sure you granted camera permission.');
+    stopARMode();
+  }
+}
+
+function stopARMode(){
+  if (arStream){
+    arStream.getTracks().forEach(track => track.stop());
+    arStream = null;
+  }
+  
+  if (arUpdateInterval){
+    clearInterval(arUpdateInterval);
+    arUpdateInterval = null;
+  }
+  
+  document.getElementById('arView').classList.remove('active');
+  arActive = false;
+}
+
+function updateARDisplay(){
+  if (!arActive || !userMarker) return;
+  
+  const userLL = userMarker.getLatLng();
+  const userPt = turf.point([userLL.lng, userLL.lat]);
+  
+  // Clear previous device icons
+  const container = document.getElementById('arDeviceContainer');
+  container.innerHTML = '';
+  
+  // Camera field of view (approximate)
+  const fovDegrees = 60; // Most phone cameras are 60-70 degrees
+  const screenWidth = window.innerWidth;
+  const screenHeight = window.innerHeight;
+  
+  // Render all nearby visible devices
+  fieldDevices.forEach((device, idx) => {
+    if (!isDeviceVisible(device)) return;
+    
+    const deviceLat = device.a || device.lat;
+    const deviceLng = device.o || device.lng;
+    const deviceName = device.n || device.name || 'Device';
+    const deviceType = device.t || device.type;
+    const placed = device.p !== undefined ? device.p : (device.placed || false);
+    
+    const devicePt = turf.point([deviceLng, deviceLat]);
+    
+    // Calculate distance
+    const distM = turf.distance(userPt, devicePt, {units: 'meters'});
+    const distFt = Math.round(distM / FT_TO_M);
+    
+    // Only show devices within 150 feet
+    if (distFt > 150) return;
+    
+    // Calculate bearing to device
+    const bearing = turf.bearing(userPt, devicePt);
+    
+    // Calculate relative bearing (accounting for device orientation)
+    let relativeBearing = bearing - deviceOrientation;
+    if (relativeBearing < -180) relativeBearing += 360;
+    if (relativeBearing > 180) relativeBearing -= 360;
+    
+    // Only show devices in camera view (within FOV)
+    const halfFov = fovDegrees / 2;
+    if (Math.abs(relativeBearing) > halfFov) return;
+    
+    // Calculate screen position
+    const xPercent = (relativeBearing / fovDegrees) * 100;
+    const xPos = (screenWidth / 2) + (xPercent / 100 * screenWidth);
+    
+    // Vertical position based on distance (closer = lower on screen)
+    // This simulates perspective
+    const maxDist = 150;
+    const minY = screenHeight * 0.3; // Far objects at 30% from top
+    const maxY = screenHeight * 0.7; // Close objects at 70% from top
+    const distRatio = Math.min(distFt / maxDist, 1);
+    const yPos = minY + ((1 - distRatio) * (maxY - minY));
+    
+    // Scale based on distance (closer = bigger)
+    const minScale = 0.3;
+    const maxScale = 1.5;
+    const scale = maxScale - ((distRatio) * (maxScale - minScale));
+    
+    // Create device icon
+    const deviceDiv = document.createElement('div');
+    deviceDiv.className = 'ar-device';
+    if (idx === currentDeviceIndex) deviceDiv.classList.add('current');
+    if (placed) deviceDiv.classList.add('placed');
+    
+    const isCone = deviceType === 'c' || deviceType === 'cone';
+    const isTaper = deviceName.toLowerCase().includes('taper');
+    const isBuffer = deviceName.toLowerCase().includes('buffer');
+    
+    if (isTaper) deviceDiv.classList.add('taper');
+    if (isBuffer) deviceDiv.classList.add('buffer');
+    
+    deviceDiv.style.left = `${xPos}px`;
+    deviceDiv.style.top = `${yPos}px`;
+    deviceDiv.style.transform = `translate(-50%, -50%) scale(${scale})`;
+    
+    if (isCone){
+      deviceDiv.innerHTML = `
+        <div class="ar-cone-icon">
+          <div class="ar-cone-shape"></div>
+          <div class="ar-cone-base"></div>
+          <div class="ar-device-label">${distFt}ft</div>
+        </div>
+      `;
+    } else {
+      deviceDiv.innerHTML = `
+        <div class="ar-sign-icon">🚸</div>
+        <div class="ar-device-label">${distFt}ft</div>
+      `;
+    }
+    
+    container.appendChild(deviceDiv);
+  });
+  
+  // Update current target info (existing code)
+  const device = fieldDevices[currentDeviceIndex];
+  if (!device) return;
+  
+  const deviceLat = device.a || device.lat;
+  const deviceLng = device.o || device.lng;
+  const deviceName = device.n || device.name || 'Device';
+  
+  const devicePt = turf.point([deviceLng, deviceLat]);
+  
+  // Calculate distance to current target
+  const distM = turf.distance(userPt, devicePt, {units: 'meters'});
+  const distFt = Math.round(distM / FT_TO_M);
+  
+  // Calculate bearing to target
+  const bearing = turf.bearing(userPt, devicePt);
+  
+  // Update distance display
+  document.getElementById('arDistance').textContent = `${distFt} ft`;
+  
+  // Calculate relative bearing (accounting for device orientation)
+  let relativeBearing = bearing - deviceOrientation;
+  if (relativeBearing < -180) relativeBearing += 360;
+  if (relativeBearing > 180) relativeBearing -= 360;
+  
+  // Update arrow rotation
+  const arrow = document.getElementById('arArrow');
+  arrow.style.transform = `rotate(${relativeBearing}deg)`;
+  
+  // Update direction text
+  const dirText = getARDirectionText(relativeBearing, distFt);
+  document.getElementById('arDirection').textContent = dirText;
+  
+  // Check for snap-to-location (within 3 feet)
+  const snapIndicator = document.getElementById('arSnap');
+  if (distFt <= 3){
+    snapIndicator.style.display = 'block';
+    if (navigator.vibrate && distFt <= 2){
+      navigator.vibrate(50);
+    }
+  } else {
+    snapIndicator.style.display = 'none';
+  }
+  
+  // Change arrow opacity based on distance
+  if (distFt <= 10){
+    arrow.style.opacity = '1';
+  } else if (distFt <= 30){
+    arrow.style.opacity = '0.8';
+  } else {
+    arrow.style.opacity = '0.6';
+  }
+}
+
+function getARDirectionText(bearing, distFt){
+  const absBearing = Math.abs(bearing);
+  
+  if (distFt <= 3){
+    return '✓ Perfect position!';
+  } else if (distFt <= 10){
+    if (absBearing < 15){
+      return 'Straight ahead';
+    } else if (bearing > 0){
+      return `Turn right ${Math.round(absBearing)}°`;
+    } else {
+      return `Turn left ${Math.round(absBearing)}°`;
+    }
+  } else {
+    if (absBearing < 20){
+      return `Go straight ${distFt} ft`;
+    } else if (bearing > 0){
+      return `Turn right and go ${distFt} ft`;
+    } else {
+      return `Turn left and go ${distFt} ft`;
+    }
+  }
+}
+
+function placeFromAR(){
+  if (!userMarker) {
+    alert('GPS not active. Start GPS tracking first.');
+    return;
+  }
+  
+  const device = fieldDevices[currentDeviceIndex];
+  if (!device) return;
+  
+  const deviceLat = device.a || device.lat;
+  const deviceLng = device.o || device.lng;
+  
+  const userLL = userMarker.getLatLng();
+  const userPt = turf.point([userLL.lng, userLL.lat]);
+  const devicePt = turf.point([deviceLng, deviceLat]);
+  
+  const distM = turf.distance(userPt, devicePt, {units: 'meters'});
+  const distFt = Math.round(distM / FT_TO_M);
+  
+  if (distFt > 10){
+    if (!confirm(`You're ${distFt} ft away from target. Place here anyway?`)){
+      return;
+    }
+  }
+  
+  // Mark as placed
+  markDevicePlaced(currentDeviceIndex);
+  
+  // Exit AR mode
+  stopARMode();
 }
 
 // Device filtering functions
@@ -2225,6 +2590,13 @@ function handleGPSError(error){
 function handleOrientation(event){
   if (event.alpha !== null){
     userHeading = event.alpha; // Device compass heading
+    deviceOrientation = event.alpha; // Store for AR mode too
+  }
+  
+  // Also use webkitCompassHeading on iOS if available
+  if (event.webkitCompassHeading !== undefined){
+    userHeading = event.webkitCompassHeading;
+    deviceOrientation = event.webkitCompassHeading;
   }
 }
 
