@@ -1218,8 +1218,8 @@ function showQRPreview(){
   try {
     const qr = new QRious({
       value: fieldUrl,
-      size: 400, // Larger for better scanning
-      level: 'M', // Medium error correction (better for long URLs)
+      size: 256, // Normal size - simpler now with compressed data
+      level: 'M', // Medium error correction
       background: 'white',
       foreground: 'black'
     });
@@ -1293,23 +1293,23 @@ function checkFieldViewMode(){
   return false;
 }
 
-// Serialize work zone data for QR code
+// Serialize work zone data for QR code (COMPACT VERSION)
 function serializeWorkZone(){
   const devices = [];
   
-  // Add cones
+  // Add cones - simplified data
   coneLayer.eachLayer(m => {
     const ll = m.getLatLng();
     devices.push({
-      type: 'cone',
-      name: m.options.title || 'Cone',
-      lat: ll.lat,
-      lng: ll.lng,
-      placed: false
+      t: 'c', // type: cone (shortened)
+      n: m.options.title || 'Cone', // name
+      a: parseFloat(ll.lat.toFixed(6)), // latitude (6 decimals = ~4 inch precision)
+      o: parseFloat(ll.lng.toFixed(6)), // longitude
+      p: false // placed
     });
   });
   
-  // Add signs
+  // Add signs - simplified data
   signLayer.eachLayer(l => {
     if (l instanceof L.Marker){
       const ll = l.getLatLng();
@@ -1319,30 +1319,31 @@ function serializeWorkZone(){
       else if (el && el.querySelector('.flagger-icon')) name = 'FLAGGER';
       else if (el && el.querySelector('.arrow-board')) name = 'ARROW BOARD';
       devices.push({
-        type: 'sign',
-        name: name,
-        lat: ll.lat,
-        lng: ll.lng,
-        placed: false
+        t: 's', // type: sign
+        n: name,
+        a: parseFloat(ll.lat.toFixed(6)),
+        o: parseFloat(ll.lng.toFixed(6)),
+        p: false
       });
     }
   });
   
-  // Get polyline coordinates if exists
+  // Get polyline coordinates if exists - simplified
   let polylineCoords = null;
   if (line){
     const gj = line.toGeoJSON();
-    polylineCoords = gj.geometry.coordinates;
+    polylineCoords = gj.geometry.coordinates.map(c => [
+      parseFloat(c[0].toFixed(6)),
+      parseFloat(c[1].toFixed(6))
+    ]);
   }
   
+  // Compact format
   return {
-    project: document.getElementById('projectName').value || 'Work Zone',
-    location: document.getElementById('projectLocation').value || '',
-    date: document.getElementById('projectDate').value || '',
-    speed: speedEl.value,
-    devices: devices,
-    polyline: polylineCoords,
-    timestamp: new Date().toISOString()
+    p: document.getElementById('projectName').value || 'Work Zone', // project
+    s: speedEl.value, // speed
+    d: devices, // devices
+    l: polylineCoords // line
   };
 }
 
@@ -1400,15 +1401,22 @@ function initFieldView(data){
   document.getElementById('fieldView').classList.add('active');
   document.getElementById('app').style.display = 'none';
   
-  // Set header info
-  document.getElementById('fieldProjectName').textContent = data.project;
+  // Set header info - handle both old and new format
+  const projectName = data.p || data.project || 'Work Zone';
+  const location = data.location || '';
+  const dateStr = data.date || '';
+  const speed = data.s || data.speed || '35';
+  const devices = data.d || data.devices || [];
+  
+  document.getElementById('fieldProjectName').textContent = projectName;
   document.getElementById('fieldProjectInfo').innerHTML = `
-    ${data.location ? data.location + ' • ' : ''}
-    ${data.date} • Speed: ${data.speed} mph • 
-    <strong>${data.devices.length} devices</strong>
+    ${location ? location + ' • ' : ''}
+    ${dateStr ? dateStr + ' • ' : ''}
+    Speed: ${speed} mph • 
+    <strong>${devices.length} devices</strong>
   `;
   
-  fieldDevices = data.devices;
+  fieldDevices = devices;
   
   // Initialize map
   setTimeout(() => {
@@ -1423,9 +1431,10 @@ function initFieldView(data){
       maxZoom: 23
     }).addTo(fieldMap);
     
-    // Draw polyline if exists
-    if (data.polyline){
-      const coords = data.polyline.map(c => [c[1], c[0]]);
+    // Draw polyline if exists - handle both formats
+    const polyline = data.l || data.polyline;
+    if (polyline){
+      const coords = polyline.map(c => [c[1], c[0]]);
       L.polyline(coords, {
         color: '#22d3ee',
         weight: 4,
@@ -1435,25 +1444,35 @@ function initFieldView(data){
       // Fit bounds to polyline
       const bounds = L.latLngBounds(coords);
       fieldMap.fitBounds(bounds, {padding: [50, 50]});
-    } else if (data.devices.length > 0){
-      // Fit to devices
-      const coords = data.devices.map(d => [d.lat, d.lng]);
+    } else if (devices.length > 0){
+      // Fit to devices - handle both formats
+      const coords = devices.map(d => {
+        const lat = d.a || d.lat;
+        const lng = d.o || d.lng;
+        return [lat, lng];
+      });
       const bounds = L.latLngBounds(coords);
       fieldMap.fitBounds(bounds, {padding: [50, 50]});
     }
     
-    // Add device markers
-    data.devices.forEach((device, idx) => {
-      const isCone = device.type === 'cone';
+    // Add device markers - handle both formats
+    devices.forEach((device, idx) => {
+      const deviceType = device.t || device.type;
+      const deviceName = device.n || device.name || 'Device';
+      const lat = device.a || device.lat;
+      const lng = device.o || device.lng;
+      const placed = device.p !== undefined ? device.p : (device.placed || false);
+      
+      const isCone = deviceType === 'c' || deviceType === 'cone';
       const icon = L.divIcon({
         className: '',
-        html: `<div class="placement-marker ${device.placed ? 'placed' : ''}" data-index="${idx}">
-          ${isCone ? '🚧' : '🚸'} ${device.name}
+        html: `<div class="placement-marker ${placed ? 'placed' : ''}" data-index="${idx}">
+          ${isCone ? '🚧' : '🚸'} ${deviceName}
         </div>`,
         iconSize: [0, 0]
       });
       
-      const marker = L.marker([device.lat, device.lng], {icon});
+      const marker = L.marker([lat, lng], {icon});
       
       marker.on('click', () => {
         showDevicePopup(marker, device, idx);
@@ -1464,7 +1483,7 @@ function initFieldView(data){
     });
     
     // Auto-show first device
-    if (data.devices.length > 0){
+    if (devices.length > 0){
       focusDevice(0);
     }
   }, 100);
@@ -1485,15 +1504,22 @@ function initFieldView(data){
 }
 
 function showDevicePopup(marker, device, idx){
+  // Handle both old and new format
+  const deviceType = device.t || device.type;
+  const deviceName = device.n || device.name || 'Device';
+  const lat = device.a || device.lat;
+  const lng = device.o || device.lng;
+  
   const distanceText = userMarker ? 
     `<div style="margin:8px 0;padding:8px;background:rgba(34,197,94,0.1);border-radius:6px;border:1px solid #22c55e">
       <div style="color:var(--success);font-weight:bold">📍 Distance: ${getDistanceToUser(device)} ft</div>
     </div>` : '';
   
+  const isCone = deviceType === 'c' || deviceType === 'cone';
   const popup = `
     <div class="device-popup">
-      <strong>${device.type === 'cone' ? '🚧 Cone' : '🚸 Sign'}: ${device.name}</strong>
-      <div class="coord">Lat: ${device.lat.toFixed(6)}<br>Lng: ${device.lng.toFixed(6)}</div>
+      <strong>${isCone ? '🚧 Cone' : '🚸 Sign'}: ${deviceName}</strong>
+      <div class="coord">Lat: ${lat.toFixed(6)}<br>Lng: ${lng.toFixed(6)}</div>
       ${distanceText}
       <button onclick="markDevicePlaced(${idx})" style="margin-top:8px;width:100%;padding:8px;background:var(--success);border:none;border-radius:6px;font-weight:bold;cursor:pointer;font-size:13px">
         ✓ Mark as Placed
@@ -1525,11 +1551,13 @@ function focusDevice(idx){
 }
 
 function nextDevice(){
-  // Find next unplaced device
+  // Find next unplaced device - handle both formats
   let nextIdx = currentDeviceIndex + 1;
   for (let i = 0; i < fieldDevices.length; i++){
     const idx = (nextIdx + i) % fieldDevices.length;
-    if (!fieldDevices[idx].placed){
+    const device = fieldDevices[idx];
+    const placed = device.p !== undefined ? device.p : (device.placed || false);
+    if (!placed){
       focusDevice(idx);
       
       // If GPS tracking is active, force navigation update
@@ -1547,7 +1575,10 @@ function nextDevice(){
 }
 
 function updateNextButton(){
-  const remaining = fieldDevices.filter(d => !d.placed).length;
+  const remaining = fieldDevices.filter(d => {
+    const placed = d.p !== undefined ? d.p : (d.placed || false);
+    return !placed;
+  }).length;
   const btn = document.getElementById('btnNextDevice');
   btn.innerHTML = remaining > 0 ? `→ Next (${remaining} left)` : '✓ All Placed';
 }
@@ -1654,10 +1685,18 @@ function updateUserPosition(position){
 
 function updateNavigation(userLat, userLng, accuracy){
   const device = fieldDevices[currentDeviceIndex];
-  if (!device || device.placed) return;
+  if (!device) return;
+  
+  // Handle both formats
+  const placed = device.p !== undefined ? device.p : (device.placed || false);
+  if (placed) return;
+  
+  const deviceLat = device.a || device.lat;
+  const deviceLng = device.o || device.lng;
+  const deviceName = device.n || device.name || 'Device';
   
   const userPt = turf.point([userLng, userLat]);
-  const devicePt = turf.point([device.lng, device.lat]);
+  const devicePt = turf.point([deviceLng, deviceLat]);
   
   // Calculate distance
   const distM = turf.distance(userPt, devicePt, {units: 'meters'});
@@ -1667,17 +1706,17 @@ function updateNavigation(userLat, userLng, accuracy){
   const bearing = turf.bearing(userPt, devicePt);
   
   // Update navigation panel
-  updateNavigationPanel(distFt, bearing, device.name);
+  updateNavigationPanel(distFt, bearing, deviceName);
   
   // Update compass arrow
   updateCompass(bearing);
   
   // Draw guidance line
-  drawGuidanceLine([userLat, userLng], [device.lat, device.lng]);
+  drawGuidanceLine([userLat, userLng], [deviceLat, deviceLng]);
   
   // Check if arrived (within 10 feet)
   if (distFt <= 10 && Date.now() - lastArrivalAlert > 5000){
-    showArrivalNotification(device.name);
+    showArrivalNotification(deviceName);
     lastArrivalAlert = Date.now();
     
     // Auto-open popup
@@ -1824,7 +1863,12 @@ function getDistanceToUser(device){
   if (!userMarker) return '—';
   
   const userLL = userMarker.getLatLng();
-  const devicePt = turf.point([device.lng, device.lat]);
+  
+  // Handle both formats
+  const deviceLat = device.a || device.lat;
+  const deviceLng = device.o || device.lng;
+  
+  const devicePt = turf.point([deviceLng, deviceLat]);
   const userPt = turf.point([userLL.lng, userLL.lat]);
   const distM = turf.distance(devicePt, userPt, {units: 'meters'});
   const distFt = Math.round(distM / FT_TO_M);
@@ -1835,6 +1879,8 @@ function getDistanceToUser(device){
 // Make this global so popup button can call it
 window.markDevicePlaced = function(idx){
   if (idx >= 0 && idx < fieldDevices.length){
+    // Update in both old and new format
+    fieldDevices[idx].p = true;
     fieldDevices[idx].placed = true;
     
     // Update marker appearance
@@ -1856,7 +1902,10 @@ window.markDevicePlaced = function(idx){
     
     // Auto-advance to next after short delay
     setTimeout(() => {
-      const remaining = fieldDevices.filter(d => !d.placed).length;
+      const remaining = fieldDevices.filter(d => {
+        const placed = d.p !== undefined ? d.p : (d.placed || false);
+        return !placed;
+      }).length;
       if (remaining > 0){
         nextDevice();
       } else {
