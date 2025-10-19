@@ -2476,6 +2476,13 @@ function generateQRCode(){
     return;
   }
   
+  // Check if QRious library is loaded
+  if (typeof QRious === 'undefined'){
+    qrContainer.innerHTML = '<div style="color:#ef4444">QR Code library not loaded. Please refresh the page.</div>';
+    console.error('QRious library not loaded');
+    return;
+  }
+  
   const data = serializeWorkZone();
   const json = JSON.stringify(data);
   const encoded = btoa(json);
@@ -2483,20 +2490,31 @@ function generateQRCode(){
   const baseUrl = window.location.href.split('#')[0].split('?')[0];
   const fieldUrl = `${baseUrl}#field=${encoded}`;
   
+  console.log('QR URL length:', fieldUrl.length);
+  
   try {
-    new QRCode(qrContainer, {
-      text: fieldUrl,
-      width: 200,
-      height: 200,
-      colorDark: "#000000",
-      colorLight: "#ffffff",
-      correctLevel: QRCode.CorrectLevel.H
+    // Create QR code using QRious
+    const qr = new QRious({
+      value: fieldUrl,
+      size: 200,
+      level: 'M',
+      background: 'white',
+      foreground: 'black'
     });
+    
+    // Append the canvas
+    qrContainer.appendChild(qr.canvas);
+    qr.canvas.style.display = 'block';
+    qr.canvas.style.margin = '0 auto';
+    qr.canvas.style.border = '20px solid white';
+    qr.canvas.style.background = 'white';
+    
   } catch(e){
     console.error('QR code generation error:', e);
-    qrContainer.innerHTML = '<div style="color:#ef4444">Error generating QR code</div>';
+    qrContainer.innerHTML = `<div style="color:#ef4444">Error generating QR code: ${e.message}</div>`;
   }
   
+  // Also display the URL for manual entry
   const urlDisplay = document.createElement('div');
   urlDisplay.style.cssText = 'margin-top:10px;padding:8px;background:#1e293b;border-radius:6px;word-break:break-all;font-size:10px;font-family:monospace;color:#60a5fa;max-height:100px;overflow-y:auto';
   urlDisplay.textContent = fieldUrl;
