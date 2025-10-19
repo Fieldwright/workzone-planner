@@ -126,7 +126,8 @@
     .print-panel td{padding:4px 8px;border:1px solid #000}
     .qr-section{margin-top:16px;padding:12px;border:2px solid #000;text-align:center;background:white}
     .qr-section h3{margin-top:0}
-    .qr-section canvas{border:20px solid white !important;background:white}
+    .qr-section canvas{border:20px solid white !important;background:white;display:block !important;margin:10px auto !important}
+    .qr-section #qrcode{min-height:280px}
   }
 
   /* Field View (Mobile) */
@@ -486,7 +487,6 @@
     </div>
     <div class="modal-footer">
       <button id="btnCloseModal" class="secondary">Close</button>
-      <button id="btnCopyUrl" style="background:var(--accent)">Copy URL</button>
     </div>
   </div>
 </div>
@@ -1287,7 +1287,10 @@ function updatePrintPanel(){
 
 function generatePlan(){
   updatePrintPanel();
-  window.print();
+  // Wait for QR code canvas to render before printing
+  setTimeout(() => {
+    window.print();
+  }, 500);
 }
 
 // Button handlers
@@ -1420,12 +1423,6 @@ function showQRPreview(){
     qr.canvas.style.margin = '0 auto';
     qr.canvas.style.border = '10px solid white';
     
-    // Show URL below for manual testing
-    const urlDisplay = document.createElement('div');
-    urlDisplay.style.cssText = 'margin-top:10px;padding:8px;background:#1e293b;border-radius:6px;word-break:break-all;font-size:10px;font-family:monospace;color:#60a5fa;max-height:100px;overflow-y:auto';
-    urlDisplay.textContent = fieldUrl;
-    qrContainer.appendChild(urlDisplay);
-    
     modal.classList.add('active');
   } catch(e){
     console.error('QR code generation error:', e);
@@ -1435,25 +1432,6 @@ function showQRPreview(){
 
 document.getElementById('btnCloseModal').addEventListener('click', () => {
   document.getElementById('qrModal').classList.remove('active');
-});
-
-document.getElementById('btnCopyUrl').addEventListener('click', () => {
-  const data = serializeWorkZone();
-  const json = JSON.stringify(data);
-  const encoded = btoa(json);
-  const baseUrl = window.location.href.split('#')[0].split('?')[0];
-  const fieldUrl = `${baseUrl}#field=${encoded}`;
-  
-  navigator.clipboard.writeText(fieldUrl).then(() => {
-    const btn = document.getElementById('btnCopyUrl');
-    const oldText = btn.textContent;
-    btn.textContent = '✓ Copied!';
-    setTimeout(() => {
-      btn.textContent = oldText;
-    }, 2000);
-  }).catch(() => {
-    alert('Could not copy URL. Please copy manually: ' + fieldUrl);
-  });
 });
 
 // Close modal on outside click
