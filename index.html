@@ -1204,6 +1204,8 @@ function showQRPreview(){
   const baseUrl = window.location.href.split('#')[0].split('?')[0];
   const fieldUrl = `${baseUrl}#field=${encoded}`;
   
+  console.log('Preview QR URL length:', fieldUrl.length);
+  
   try {
     new QRCode(qrContainer, {
       text: fieldUrl,
@@ -1211,8 +1213,15 @@ function showQRPreview(){
       height: 256,
       colorDark: "#000000",
       colorLight: "#ffffff",
-      correctLevel: QRCode.CorrectLevel.M
+      correctLevel: QRCode.CorrectLevel.H // High error correction
     });
+    
+    // Show URL below for manual testing
+    const urlDisplay = document.createElement('div');
+    urlDisplay.style.cssText = 'margin-top:10px;padding:8px;background:#1e293b;border-radius:6px;word-break:break-all;font-size:10px;font-family:monospace;color:#60a5fa;max-height:100px;overflow-y:auto';
+    urlDisplay.textContent = fieldUrl;
+    qrContainer.appendChild(urlDisplay);
+    
     modal.classList.add('active');
   } catch(e){
     console.error('QR code generation error:', e);
@@ -1350,12 +1359,18 @@ function generateQRCode(){
       height: 200,
       colorDark: "#000000",
       colorLight: "#ffffff",
-      correctLevel: QRCode.CorrectLevel.M
+      correctLevel: QRCode.CorrectLevel.H // High error correction
     });
   } catch(e){
     console.error('QR code generation error:', e);
     qrContainer.innerHTML = '<div style="color:#ef4444">Error generating QR code</div>';
   }
+  
+  // Also display the URL for manual entry if QR fails
+  const urlDisplay = document.createElement('div');
+  urlDisplay.style.cssText = 'margin-top:10px;padding:8px;background:#1e293b;border-radius:6px;word-break:break-all;font-size:10px;font-family:monospace;color:#60a5fa;max-height:100px;overflow-y:auto';
+  urlDisplay.textContent = fieldUrl;
+  qrContainer.appendChild(urlDisplay);
 }
 
 // Initialize field view
