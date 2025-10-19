@@ -44,6 +44,26 @@
   .hr{border-top:1px solid #1f2937;margin:8px 0}
   #map{height:100vh;width:100%}
   
+  /* Leaflet Layer Control Styling */
+  .leaflet-control-layers{background:var(--panel);border:2px solid var(--accent);border-radius:8px;padding:8px;box-shadow:0 2px 8px rgba(0,0,0,0.5)}
+  .leaflet-control-layers-toggle{background-image:url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzYiIGhlaWdodD0iMzYiIHZpZXdCb3g9IjAgMCAzNiAzNiIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cGF0aCBmaWxsPSIjZTVlN2ViIiBkPSJNIDYgOCBMIDMwIDggTCAzMCAxMCBMIDYgMTAgWiBNIDYgMTcgTCAzMCAxNyBMIDMwIDE5IEwgNiAxOSBaIE0gNiAyNiBMIDMwIDI2IEwgMzAgMjggTCA2IDI4IFoiLz48L3N2Zz4=');background-size:26px 26px;width:36px;height:36px}
+  .leaflet-control-layers-list{color:var(--text);font-size:13px}
+  .leaflet-control-layers-base label{display:flex;align-items:center;gap:6px;padding:4px;cursor:pointer;transition:background 0.2s}
+  .leaflet-control-layers-base label:hover{background:rgba(96,165,250,0.1);border-radius:4px}
+  .leaflet-control-layers-separator{border-top:1px solid #374151;margin:4px 0}
+  .leaflet-control-layers input{cursor:pointer}
+  
+  /* Enhanced Zoom Controls */
+  .leaflet-control-zoom{border:2px solid var(--accent);border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.5)}
+  .leaflet-control-zoom a{background:var(--panel);color:var(--text);border-bottom:1px solid #374151;width:36px;height:36px;line-height:36px;font-size:20px;font-weight:bold}
+  .leaflet-control-zoom a:hover{background:#1f2937}
+  .leaflet-control-zoom a:last-child{border-bottom:none}
+  .leaflet-bar{box-shadow:none}
+  
+  /* Scale Control */
+  .leaflet-control-scale{background:rgba(17,24,39,0.9);border:2px solid var(--accent);border-radius:6px;padding:2px 8px;font-size:11px;font-weight:bold;color:var(--text);box-shadow:0 2px 8px rgba(0,0,0,0.5)}
+  .leaflet-control-scale-line{border:2px solid var(--accent);border-top:none;color:var(--text);background:transparent}
+  
   /* Icons */
   .cone {width:0;height:0;border-left:8px solid transparent;border-right:8px solid transparent;border-bottom:20px solid #ff6a00;position:relative;transform:translate(-8px,-20px);filter:drop-shadow(0 1px 0 #7a2d00);}
   .cone:after {content:"";position:absolute;left:-10px;bottom:-5px;width:20px;height:5px;background:#7a2d00;border-radius:3px;}
@@ -184,6 +204,25 @@
       </div>
     </div>
     <div class="sub">Professional work zone planning with MUTCD compliance, advanced features, and comprehensive reporting.</div>
+
+    <!-- Address Search -->
+    <div class="section">
+      <div class="section-header" data-section="search">
+        <div class="section-title">🔍 Location Search</div>
+        <span class="section-icon">▼</span>
+      </div>
+      <div class="section-content" data-section="search">
+        <label>Search Address or Place</label>
+        <div style="display:flex;gap:6px">
+          <input id="addressSearch" type="text" placeholder="e.g., 123 Main St, Portland ME" style="flex:1">
+          <button id="btnSearch" class="secondary" style="width:60px;padding:6px">Go</button>
+        </div>
+        <div id="searchResults" style="margin-top:6px;font-size:11px;color:var(--muted)"></div>
+        <div style="margin-top:8px;padding:6px;background:#1e293b;border-radius:6px;font-size:10px;color:var(--muted)">
+          💡 <strong>Tip:</strong> Use the layer switcher (top right) to choose between Satellite, Hybrid (with labels), Street, or Topo maps. Zoom up to level 22 for detailed views.
+        </div>
+      </div>
+    </div>
 
     <!-- Project Info Section -->
     <div class="section">
@@ -473,11 +512,61 @@ const DEVICE_COSTS = {
   'default': 100
 };
 
-// Map
-const map = L.map('map', { minZoom: 3, maxZoom: 23 }).setView([39.5,-98.35], 5);
-L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-  attribution: 'Tiles © Esri', maxZoom: 23
+// Map with multiple basemap options
+const map = L.map('map', { minZoom: 3, maxZoom: 22 }).setView([39.5,-98.35], 5);
+
+// Define basemap layers
+const baseLayers = {
+  'Satellite': L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+    attribution: 'Tiles © Esri',
+    maxZoom: 22
+  }),
+  'Hybrid (Labels)': L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+    attribution: 'Tiles © Esri',
+    maxZoom: 22
+  }),
+  'Street Map': L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© OpenStreetMap contributors',
+    maxZoom: 19
+  }),
+  'Topo Map': L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}', {
+    attribution: 'Tiles © Esri',
+    maxZoom: 19
+  })
+};
+
+// Street labels overlay for Hybrid mode
+const streetLabels = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}', {
+  attribution: '',
+  maxZoom: 22
+});
+
+// Add default layer
+baseLayers['Satellite'].addTo(map);
+
+// Layer control
+const layerControl = L.control.layers(baseLayers, null, {
+  position: 'topright',
+  collapsed: false
 }).addTo(map);
+
+// Add scale bar (shows distance in feet and meters)
+L.control.scale({
+  position: 'bottomleft',
+  imperial: true,
+  metric: true
+}).addTo(map);
+
+// Handle Hybrid layer - add labels when selected
+map.on('baselayerchange', function(e) {
+  if (e.name === 'Hybrid (Labels)') {
+    streetLabels.addTo(map);
+  } else {
+    if (map.hasLayer(streetLabels)) {
+      map.removeLayer(streetLabels);
+    }
+  }
+});
 
 // Layers
 const drawnItems = new L.FeatureGroup().addTo(map);
@@ -1221,6 +1310,75 @@ document.getElementById('btn-export-csv').addEventListener('click', exportCSV);
 document.getElementById('btn-print').addEventListener('click', generatePlan);
 document.getElementById('btn-preview-qr').addEventListener('click', showQRPreview);
 
+// Address Search
+document.getElementById('btnSearch').addEventListener('click', searchAddress);
+document.getElementById('addressSearch').addEventListener('keypress', (e) => {
+  if (e.key === 'Enter') searchAddress();
+});
+
+function searchAddress(){
+  const query = document.getElementById('addressSearch').value.trim();
+  const resultsDiv = document.getElementById('searchResults');
+  
+  if (!query){
+    resultsDiv.innerHTML = '<span style="color:#ef4444">Please enter an address</span>';
+    return;
+  }
+  
+  resultsDiv.innerHTML = 'Searching...';
+  document.getElementById('btnSearch').disabled = true;
+  
+  // Use Nominatim API (OpenStreetMap geocoding)
+  const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1`;
+  
+  fetch(url, {
+    headers: {
+      'User-Agent': 'WorkZonePlanner/1.0' // Nominatim requires a user agent
+    }
+  })
+  .then(response => response.json())
+  .then(data => {
+    document.getElementById('btnSearch').disabled = false;
+    
+    if (data && data.length > 0){
+      const result = data[0];
+      const lat = parseFloat(result.lat);
+      const lon = parseFloat(result.lon);
+      
+      // Fly to location
+      map.flyTo([lat, lon], 18, {
+        duration: 1.5
+      });
+      
+      // Add temporary marker
+      const tempMarker = L.marker([lat, lon], {
+        icon: L.divIcon({
+          className: '',
+          html: '<div style="background:#3b82f6;color:#fff;padding:4px 8px;border-radius:6px;font-weight:bold;font-size:11px;border:2px solid #fff;box-shadow:0 2px 4px rgba(0,0,0,0.5)">📍 Found</div>',
+          iconSize: [0, 0]
+        })
+      }).addTo(map);
+      
+      // Auto-remove after 5 seconds
+      setTimeout(() => map.removeLayer(tempMarker), 5000);
+      
+      resultsDiv.innerHTML = `<span style="color:var(--success)">✓ Found: ${result.display_name}</span>`;
+      
+      // Auto-populate project location if empty
+      if (!document.getElementById('projectLocation').value){
+        document.getElementById('projectLocation').value = result.display_name.split(',').slice(0, 2).join(',');
+      }
+    } else {
+      resultsDiv.innerHTML = '<span style="color:#ef4444">Location not found. Try a different address.</span>';
+    }
+  })
+  .catch(error => {
+    console.error('Search error:', error);
+    document.getElementById('btnSearch').disabled = false;
+    resultsDiv.innerHTML = '<span style="color:#ef4444">Search failed. Please try again.</span>';
+  });
+}
+
 // QR Preview Modal
 function showQRPreview(){
   if (coneLayer.getLayers().length === 0 && signLayer.getLayers().length === 0){
@@ -1455,13 +1613,20 @@ function initFieldView(data){
   setTimeout(() => {
     fieldMap = L.map('fieldViewMap', {
       minZoom: 10,
-      maxZoom: 23,
+      maxZoom: 22,
       zoomControl: true
     }).setView([39.5, -98.35], 5);
     
+    // Use hybrid view for field work (satellite + labels)
     L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
       attribution: 'Tiles © Esri',
-      maxZoom: 23
+      maxZoom: 22
+    }).addTo(fieldMap);
+    
+    // Add street labels overlay for field navigation
+    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}', {
+      attribution: '',
+      maxZoom: 22
     }).addTo(fieldMap);
     
     // Draw polyline if exists - handle both formats
