@@ -872,6 +872,22 @@ const DEVICE_COSTS = {
   'default': 100
 };
 
+// URL-safe Base64 encoding/decoding
+function toUrlSafeBase64(str) {
+  return btoa(str)
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '');
+}
+
+function fromUrlSafeBase64(str) {
+  str = str.replace(/-/g, '+').replace(/_/g, '/');
+  while (str.length % 4) {
+    str += '=';
+  }
+  return atob(str);
+}
+
 const map = L.map('map', { minZoom: 3, maxZoom: 22 }).setView([39.5,-98.35], 5);
 
 const baseLayers = {
@@ -1750,9 +1766,9 @@ function loadProject(data) {
 function shareProject() {
   const data = saveProjectData();
   const json = JSON.stringify(data);
-  const encoded = btoa(json);
+  const encoded = toUrlSafeBase64(json);
   const baseUrl = window.location.href.split('#')[0].split('?')[0];
-  const shareUrl = `${baseUrl}#load=${encoded}`;
+  const shareUrl = `${baseUrl}?load=${encodeURIComponent(encoded)}`;
   
   document.getElementById('shareLink').textContent = shareUrl;
   document.getElementById('shareLinkContainer').style.display = 'block';
@@ -2280,7 +2296,7 @@ function autoSave() {
 
 function loadAutoSave() {
   const saved = localStorage.getItem('workzone_autosave');
-  if (saved && !window.location.hash) {
+  if (saved && !window.location.hash && !window.location.search.includes('field') && !window.location.search.includes('load')) {
     try {
       const data = JSON.parse(saved);
       if (data.cones && data.cones.length > 0) {
@@ -2341,17 +2357,37 @@ function loadProjectFromCompact(data) {
 }
 
 function checkForSharedProject() {
+  // Check for query parameter (new method)
+  const urlParams = new URLSearchParams(window.location.search);
+  const loadParam = urlParams.get('load');
+  
+  if (loadParam) {
+    try {
+      const decoded = fromUrlSafeBase64(decodeURIComponent(loadParam));
+      const data = JSON.parse(decoded);
+      loadProjectFromCompact(data);
+      alert('✓ Shared project loaded successfully!');
+      // Clean up URL
+      window.history.replaceState(null, null, window.location.pathname);
+      return;
+    } catch (e) {
+      console.error('Failed to load shared project from query param:', e);
+      alert('Error loading shared project. The link may be invalid or corrupted.');
+    }
+  }
+  
+  // Fallback to hash method (old method for backwards compatibility)
   const hash = window.location.hash;
   if (hash.startsWith('#load=')) {
     try {
       const encoded = hash.substring(6);
-      const decoded = atob(encoded);
+      const decoded = fromUrlSafeBase64(encoded);
       const data = JSON.parse(decoded);
       loadProjectFromCompact(data);
       alert('✓ Shared project loaded successfully!');
       window.history.replaceState(null, null, window.location.pathname);
     } catch (e) {
-      console.error('Failed to load shared project:', e);
+      console.error('Failed to load shared project from hash:', e);
       alert('Error loading shared project. The link may be invalid or corrupted.');
     }
   }
@@ -2480,19 +2516,20 @@ function generateQRCode(){
   
   const data = serializeWorkZone();
   const json = JSON.stringify(data);
-  const encoded = btoa(json);
+  const encoded = toUrlSafeBase64(json);
   
   const baseUrl = window.location.href.split('#')[0].split('?')[0];
-  const fieldUrl = `${baseUrl}#field=${encoded}`;
+  const fieldUrl = `${baseUrl}?field=${encodeURIComponent(encoded)}`;
   
   console.log('QR URL length:', fieldUrl.length);
+  console.log('QR URL:', fieldUrl.substring(0, 100) + '...');
   
   try {
-    // Create QR code using QRious
+    // Create QR code using QRious with higher error correction for better scanning
     const qr = new QRious({
       value: fieldUrl,
       size: 200,
-      level: 'M',
+      level: 'H',
       background: 'white',
       foreground: 'black'
     });
@@ -2509,10 +2546,18 @@ function generateQRCode(){
     qrContainer.innerHTML = `<div style="color:#ef4444">Error generating QR code: ${e.message}</div>`;
   }
   
-  // Also display the URL for manual entry
+  // Also display the URL for manual entry with copy button
   const urlDisplay = document.createElement('div');
-  urlDisplay.style.cssText = 'margin-top:10px;padding:8px;background:#1e293b;border-radius:6px;word-break:break-all;font-size:10px;font-family:monospace;color:#60a5fa;max-height:100px;overflow-y:auto';
+  urlDisplay.style.cssText = 'margin-top:10px;padding:8px;background:#1e293b;border-radius:6px;word-break:break-all;font-size:10px;font-family:monospace;color:#60a5fa;max-height:100px;overflow-y:auto;cursor:pointer';
   urlDisplay.textContent = fieldUrl;
+  urlDisplay.title = 'Click to copy URL';
+  urlDisplay.addEventListener('click', () => {
+    navigator.clipboard.writeText(fieldUrl).then(() => {
+      const originalText = urlDisplay.textContent;
+      urlDisplay.textContent = '✓ Copied!';
+      setTimeout(() => urlDisplay.textContent = originalText, 2000);
+    });
+  });
   qrContainer.appendChild(urlDisplay);
 }
 
@@ -2534,17 +2579,18 @@ function showQRPreview(){
   
   const data = serializeWorkZone();
   const json = JSON.stringify(data);
-  const encoded = btoa(json);
+  const encoded = toUrlSafeBase64(json);
   const baseUrl = window.location.href.split('#')[0].split('?')[0];
-  const fieldUrl = `${baseUrl}#field=${encoded}`;
+  const fieldUrl = `${baseUrl}?field=${encodeURIComponent(encoded)}`;
   
   console.log('Preview QR URL length:', fieldUrl.length);
+  console.log('Data size:', json.length, 'bytes');
   
   try {
     const qr = new QRious({
       value: fieldUrl,
       size: 256,
-      level: 'M',
+      level: 'H',
       background: 'white',
       foreground: 'black'
     });
@@ -2553,6 +2599,18 @@ function showQRPreview(){
     qr.canvas.style.display = 'block';
     qr.canvas.style.margin = '0 auto';
     qr.canvas.style.border = '10px solid white';
+    
+    // Add copy button
+    const copyBtn = document.createElement('button');
+    copyBtn.textContent = '📋 Copy URL';
+    copyBtn.style.cssText = 'margin-top:12px;width:100%;padding:8px;background:var(--accent);border:none;border-radius:8px;font-weight:bold;cursor:pointer;font-size:13px';
+    copyBtn.onclick = () => {
+      navigator.clipboard.writeText(fieldUrl).then(() => {
+        copyBtn.textContent = '✓ Copied!';
+        setTimeout(() => copyBtn.textContent = '📋 Copy URL', 2000);
+      });
+    };
+    qrContainer.appendChild(copyBtn);
     
     modal.classList.add('active');
   } catch(e){
@@ -2573,6 +2631,7 @@ document.getElementById('qrModal').addEventListener('click', (e) => {
 
 [spacingEl, bufferSpacingEl, scaleEl, stationStepEl].forEach(el => el.addEventListener('input', updateStats));
 
+// FIELD VIEW CODE
 let fieldMap = null;
 let fieldDevices = [];
 let currentDeviceIndex = 0;
@@ -2668,22 +2727,44 @@ function playCompletionSound(){
 }
 
 function checkFieldViewMode(){
+  // Check for query parameter (new method - better for iPhone)
+  const urlParams = new URLSearchParams(window.location.search);
+  const fieldParam = urlParams.get('field');
+  
+  if (fieldParam) {
+    try {
+      const decoded = fromUrlSafeBase64(decodeURIComponent(fieldParam));
+      const fieldData = JSON.parse(decoded);
+      console.log('Loading field view from query parameter');
+      initFieldView(fieldData);
+      return true;
+    } catch(e) {
+      console.error('Error loading field data from query param:', e);
+      alert('Error loading field setup. The QR code may be invalid or corrupted. Error: ' + e.message);
+    }
+  }
+  
+  // Fallback to hash method (old method for backwards compatibility)
   const hash = window.location.hash;
   if (hash.startsWith('#field=')){
     try {
       const data = hash.substring(7);
-      const decoded = atob(data);
+      const decoded = fromUrlSafeBase64(data);
       const fieldData = JSON.parse(decoded);
+      console.log('Loading field view from hash (legacy)');
       initFieldView(fieldData);
       return true;
     } catch(e){
-      console.error('Error loading field data:', e);
+      console.error('Error loading field data from hash:', e);
+      alert('Error loading field setup. The QR code may be invalid or corrupted. Error: ' + e.message);
     }
   }
   return false;
 }
 
 function initFieldView(data){
+  console.log('Initializing field view with data:', data);
+  
   document.getElementById('fieldView').classList.add('active');
   document.getElementById('app').style.display = 'none';
   
@@ -2692,6 +2773,8 @@ function initFieldView(data){
   const dateStr = data.date || '';
   const speed = data.s || data.speed || '35';
   const devices = data.d || data.devices || [];
+  
+  console.log(`Field view loaded: ${devices.length} devices`);
   
   document.getElementById('fieldProjectName').textContent = projectName;
   
@@ -2706,6 +2789,11 @@ function initFieldView(data){
     <strong>${totalDevices} devices</strong> • 
     <span style="color:var(--success)">${placedDevices} placed (${progressPercent}%)</span>
   `;
+  
+  if (totalDevices === 0) {
+    alert('Warning: No devices found in this work zone plan. Please check the QR code or share link.');
+    return;
+  }
   
   fieldDevices = devices;
   
@@ -2804,6 +2892,8 @@ function initFieldView(data){
     }
     
     updateFilterInfo();
+    
+    console.log('✓ Field view map initialized successfully');
   }, 100);
   
   document.getElementById('btnLocateMe').addEventListener('click', startGPSTracking);
@@ -2815,8 +2905,7 @@ function initFieldView(data){
     
     saveFieldProgress();
     
-    window.location.hash = '';
-    window.location.reload();
+    window.location.href = window.location.pathname;
   });
   
   document.getElementById('btnARClose').addEventListener('click', stopARMode);
@@ -2948,7 +3037,9 @@ function focusDevice(idx){
   const device = fieldDevices[idx];
   
   if (device._marker){
-    fieldMap.setView([device.lat, device.lng], 20, {animate: true});
+    const lat = device.a || device.lat;
+    const lng = device.o || device.lng;
+    fieldMap.setView([lat, lng], 20, {animate: true});
     showDevicePopup(device._marker, device, idx);
     
     if (gpsWatchId !== null && userMarker){
@@ -3287,7 +3378,6 @@ async function startARMode(){
   }
   
   try {
-    // Request camera access
     arStream = await navigator.mediaDevices.getUserMedia({
       video: { 
         facingMode: 'environment',
@@ -3299,21 +3389,16 @@ async function startARMode(){
     const video = document.getElementById('arCamera');
     video.srcObject = arStream;
     
-    // Show AR view
     document.getElementById('arView').classList.add('active');
     arActive = true;
     
-    // Initialize device orientation if not already done
     if (deviceOrientation === 0 && devicePitch === 0) {
-      // Set defaults for better initial display
       deviceOrientation = 0;
-      devicePitch = 60; // Looking slightly downward
+      devicePitch = 60;
     }
     
-    // Update AR display continuously
     arUpdateInterval = setInterval(updateARDisplay, 100);
     
-    // Request device orientation permission on iOS
     if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function'){
       try {
         const permission = await DeviceOrientationEvent.requestPermission();
@@ -3325,7 +3410,6 @@ async function startARMode(){
       }
     }
     
-    // Give visual feedback
     console.log('AR Mode started. Devices:', fieldDevices.length);
     console.log('User location:', userMarker.getLatLng());
     
@@ -3362,12 +3446,11 @@ function updateARDisplay(){
   
   const screenWidth = window.innerWidth;
   const screenHeight = window.innerHeight;
-  const fovHorizontal = 70; // Wider FOV for better visibility
+  const fovHorizontal = 70;
   const fovVertical = 50;
   
-  const eyeHeight = 5; // 5 feet eye height
+  const eyeHeight = 5;
   
-  // Render ALL devices in AR (not just filtered ones)
   let devicesRendered = 0;
   
   fieldDevices.forEach((device, idx) => {
@@ -3379,49 +3462,38 @@ function updateARDisplay(){
     
     const devicePt = turf.point([deviceLng, deviceLat]);
     
-    // Calculate distance
     const distM = turf.distance(userPt, devicePt, {units: 'meters'});
     const distFt = distM / FT_TO_M;
     
-    // Show devices within 200 feet
     if (distFt > 200) return;
     
-    // Calculate bearing to device
     const bearing = turf.bearing(userPt, devicePt);
     
-    // Calculate relative bearing (accounting for device orientation)
     let relativeBearing = bearing - deviceOrientation;
     if (relativeBearing < -180) relativeBearing += 360;
     if (relativeBearing > 180) relativeBearing -= 360;
     
-    // Check if device is in camera FOV
     const halfFovH = fovHorizontal / 2;
     if (Math.abs(relativeBearing) > halfFovH) return;
     
-    // Calculate horizontal screen position
     const xPercent = relativeBearing / fovHorizontal;
     const xPos = (screenWidth / 2) + (xPercent * screenWidth);
     
-    // GROUND PLANE PROJECTION with better vertical positioning
-    const pitchDeg = Math.max(30, Math.min(90, devicePitch)); // Clamp pitch
-    const distanceToDevice = Math.max(distFt, 1); // Avoid division by zero
+    const pitchDeg = Math.max(30, Math.min(90, devicePitch));
+    const distanceToDevice = Math.max(distFt, 1);
     
-    // Calculate vertical position based on ground plane
     const angleToGround = Math.atan(eyeHeight / distanceToDevice) * (180 / Math.PI);
     const cameraLookAngle = 90 - pitchDeg;
     const objectAngleFromCenter = cameraLookAngle - angleToGround;
     const yPercent = objectAngleFromCenter / fovVertical;
     const yPos = (screenHeight / 2) - (yPercent * screenHeight);
     
-    // Show devices even if slightly off-screen
     if (yPos < -100 || yPos > screenHeight + 100) return;
     
-    // Scale based on distance (closer = bigger)
     const baseScale = 1.0;
     const scaleFactor = (100 / Math.max(distFt, 5)) * baseScale;
-    const scale = Math.max(0.3, Math.min(scaleFactor, 2.5)); // Better scale range
+    const scale = Math.max(0.3, Math.min(scaleFactor, 2.5));
     
-    // Create device icon
     const deviceDiv = document.createElement('div');
     deviceDiv.className = 'ar-device';
     if (idx === currentDeviceIndex) deviceDiv.classList.add('current');
@@ -3437,7 +3509,7 @@ function updateARDisplay(){
     deviceDiv.style.left = `${xPos}px`;
     deviceDiv.style.top = `${yPos}px`;
     deviceDiv.style.transform = `translate(-50%, -100%) scale(${scale})`;
-    deviceDiv.style.zIndex = Math.round(1000 - distFt); // Closer objects on top
+    deviceDiv.style.zIndex = Math.round(1000 - distFt);
     
     const showDist = distFt >= 5;
     
@@ -3466,7 +3538,6 @@ function updateARDisplay(){
     devicesRendered++;
   });
   
-  // Update HUD info for current target
   const device = fieldDevices[currentDeviceIndex];
   if (!device) return;
   
@@ -3480,7 +3551,6 @@ function updateARDisplay(){
   
   const bearing = turf.bearing(userPt, devicePt);
   
-  // Update HUD
   document.getElementById('arDistance').textContent = `${distFt} ft`;
   
   let relativeBearing = bearing - deviceOrientation;
@@ -3490,11 +3560,9 @@ function updateARDisplay(){
   const dirText = getARDirectionText(relativeBearing, distFt);
   document.getElementById('arDirection').innerHTML = `${dirText}<br><span style="font-size:10px;opacity:0.7">${devicesRendered} devices visible</span>`;
   
-  // Update arrow
   const arrow = document.getElementById('arArrow');
   arrow.style.transform = `rotate(${relativeBearing}deg)`;
   
-  // Snap indicator
   const snapIndicator = document.getElementById('arSnap');
   if (distFt <= 3){
     snapIndicator.style.display = 'block';
@@ -3505,7 +3573,6 @@ function updateARDisplay(){
     snapIndicator.style.display = 'none';
   }
   
-  // Arrow opacity based on distance
   if (distFt <= 10){
     arrow.style.opacity = '1';
   } else if (distFt <= 30){
@@ -3514,7 +3581,6 @@ function updateARDisplay(){
     arrow.style.opacity = '0.6';
   }
   
-  // Debug info in console
   if (devicesRendered === 0) {
     console.log('AR Debug: No devices rendered. Total devices:', fieldDevices.length);
     console.log('User position:', userLL.lat, userLL.lng);
@@ -3735,6 +3801,7 @@ if (!checkFieldViewMode()){
   console.log('✓ AR Mode with distance markers');
   console.log('✓ Multi-phase planning');
   console.log('✓ Traffic analysis tools');
+  console.log('✓ QR Code fixed for iPhone scanning');
   console.log('✓ All features loaded');
 }
 </script>
