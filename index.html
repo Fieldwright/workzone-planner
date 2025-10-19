@@ -104,8 +104,9 @@
     .print-panel table{width:100%;border-collapse:collapse;margin:8px 0;font-size:12px}
     .print-panel th{background:#e5e7eb;padding:4px 8px;text-align:left;border:1px solid #000}
     .print-panel td{padding:4px 8px;border:1px solid #000}
-    .qr-section{margin-top:16px;padding:12px;border:2px solid #000;text-align:center}
+    .qr-section{margin-top:16px;padding:12px;border:2px solid #000;text-align:center;background:white}
     .qr-section h3{margin-top:0}
+    .qr-section canvas{border:20px solid white !important;background:white}
   }
 
   /* Field View (Mobile) */
@@ -1217,13 +1218,16 @@ function showQRPreview(){
   try {
     const qr = new QRious({
       value: fieldUrl,
-      size: 256,
-      level: 'H' // High error correction
+      size: 400, // Larger for better scanning
+      level: 'M', // Medium error correction (better for long URLs)
+      background: 'white',
+      foreground: 'black'
     });
     
     qrContainer.appendChild(qr.canvas);
     qr.canvas.style.display = 'block';
     qr.canvas.style.margin = '0 auto';
+    qr.canvas.style.border = '10px solid white';
     
     // Show URL below for manual testing
     const urlDisplay = document.createElement('div');
