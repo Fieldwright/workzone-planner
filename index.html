@@ -199,28 +199,51 @@
   #arView.active{display:flex;flex-direction:column}
   #arCamera{width:100%;height:100%;object-fit:cover}
   .ar-overlay{position:absolute;top:0;left:0;right:0;bottom:0;pointer-events:none}
-  .ar-hud{position:absolute;top:20px;left:50%;transform:translateX(-50%);background:rgba(17,24,39,0.9);padding:12px 20px;border-radius:12px;border:2px solid var(--accent);color:var(--text);text-align:center;font-weight:bold;backdrop-filter:blur(10px)}
+  .ar-hud{position:absolute;top:20px;left:50%;transform:translateX(-50%);background:rgba(17,24,39,0.9);padding:12px 20px;border-radius:12px;border:2px solid var(--accent);color:var(--text);text-align:center;font-weight:bold;backdrop-filter:blur(10px);max-width:90%}
   .ar-distance{font-size:32px;color:var(--accent);line-height:1}
   .ar-direction{font-size:14px;margin-top:4px;color:var(--muted)}
+  .ar-tip{font-size:10px;margin-top:6px;color:#60a5fa;opacity:0.8}
   .ar-arrow{position:absolute;top:50%;left:50%;width:80px;height:80px;margin-left:-40px;margin-top:-40px;transition:transform 0.3s ease}
   .ar-arrow svg{width:100%;height:100%;filter:drop-shadow(0 4px 8px rgba(0,0,0,0.5))}
   .ar-reticle{position:absolute;top:50%;left:50%;width:60px;height:60px;margin-left:-30px;margin-top:-30px;border:3px solid var(--accent);border-radius:50%;animation:pulse 1.5s ease-in-out infinite}
   @keyframes pulse{0%,100%{transform:scale(1);opacity:0.6} 50%{transform:scale(1.2);opacity:1}}
   
-  /* AR Device Icons */
-  .ar-device{position:absolute;transition:all 0.2s ease;filter:drop-shadow(0 4px 8px rgba(0,0,0,0.8));pointer-events:none}
+  /* AR Device Icons - 3D */
+  .ar-device{position:absolute;transition:all 0.2s ease;pointer-events:none;z-index:10;transform-style:preserve-3d}
   .ar-device.current{animation:highlight 1s ease-in-out infinite}
-  @keyframes highlight{0%,100%{filter:drop-shadow(0 4px 12px rgba(96,165,250,1))} 50%{filter:drop-shadow(0 4px 20px rgba(96,165,250,0.5))}}
-  .ar-cone-icon{width:40px;height:50px;position:relative}
-  .ar-cone-shape{width:0;height:0;border-left:20px solid transparent;border-right:20px solid transparent;border-bottom:40px solid #ff6a00;position:absolute;bottom:5px;left:0;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.5))}
-  .ar-cone-base{width:30px;height:8px;background:#7a2d00;border-radius:4px;position:absolute;bottom:0;left:5px}
-  .ar-sign-icon{width:40px;height:40px;background:#facc15;border:3px solid #000;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:24px;box-shadow:0 4px 8px rgba(0,0,0,0.5)}
-  .ar-device-label{position:absolute;bottom:-20px;left:50%;transform:translateX(-50%);background:rgba(17,24,39,0.9);color:#fff;padding:2px 6px;border-radius:4px;font-size:10px;white-space:nowrap;font-weight:bold}
-  .ar-device.placed{opacity:0.3}
-  .ar-device.taper .ar-cone-shape{border-bottom-color:#22c55e}
-  .ar-device.buffer .ar-cone-shape{border-bottom-color:#f59e0b}
+  @keyframes highlight{0%,100%{filter:drop-shadow(0 4px 12px rgba(96,165,250,1)) drop-shadow(0 0 20px rgba(96,165,250,0.8))} 50%{filter:drop-shadow(0 4px 20px rgba(96,165,250,0.5))}}
   
-  .ar-snap{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:var(--success);color:#000;padding:24px 40px;border-radius:16px;font-size:24px;font-weight:bold;border:4px solid #fff;box-shadow:0 8px 24px rgba(0,0,0,0.8);animation:snapPulse 0.5s ease}
+  /* 3D Cone */
+  .ar-cone-3d{width:60px;height:80px;position:relative;transform-style:preserve-3d}
+  .cone-body{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);width:0;height:0;border-left:30px solid transparent;border-right:30px solid transparent;border-bottom:60px solid #ff6a00;filter:drop-shadow(2px 4px 6px rgba(0,0,0,0.5))}
+  .cone-body::before{content:'';position:absolute;bottom:0;left:-30px;width:0;height:0;border-left:30px solid transparent;border-right:30px solid transparent;border-bottom:60px solid #d85500;opacity:0.6;transform:rotateY(45deg)}
+  .cone-base-3d{position:absolute;bottom:0;left:50%;transform:translateX(-50%);width:50px;height:12px;background:radial-gradient(ellipse at center, #8b3500 0%, #6b2700 100%);border-radius:50%;box-shadow:0 2px 8px rgba(0,0,0,0.6)}
+  .cone-shadow{position:absolute;bottom:-5px;left:50%;transform:translateX(-50%);width:55px;height:8px;background:radial-gradient(ellipse at center, rgba(0,0,0,0.4) 0%, transparent 70%);border-radius:50%}
+  .cone-stripe{position:absolute;bottom:30px;left:50%;transform:translateX(-50%);width:40px;height:8px;background:#fff;clip-path:polygon(0 0, 100% 0, 90% 100%, 10% 100%);opacity:0.9}
+  
+  /* Green taper cone */
+  .ar-device.taper .cone-body{border-bottom-color:#22c55e}
+  .ar-device.taper .cone-body::before{border-bottom-color:#16a34a}
+  
+  /* Orange buffer cone */
+  .ar-device.buffer .cone-body{border-bottom-color:#f59e0b}
+  .ar-device.buffer .cone-body::before{border-bottom-color:#d97706}
+  
+  /* 3D Sign */
+  .ar-sign-3d{width:70px;height:90px;position:relative;transform-style:preserve-3d}
+  .sign-post{position:absolute;bottom:0;left:50%;transform:translateX(-50%);width:8px;height:50px;background:linear-gradient(to right, #666 0%, #888 50%, #666 100%);border-radius:4px;box-shadow:2px 2px 4px rgba(0,0,0,0.5)}
+  .sign-post::before{content:'';position:absolute;top:0;left:0;width:100%;height:100%;background:linear-gradient(to bottom, rgba(255,255,255,0.2) 0%, transparent 50%);border-radius:4px}
+  .sign-panel{position:absolute;bottom:30px;left:50%;transform:translateX(-50%);width:50px;height:50px;background:linear-gradient(135deg, #facc15 0%, #fde047 50%, #facc15 100%);border:4px solid #000;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:28px;box-shadow:0 4px 8px rgba(0,0,0,0.5), inset -2px -2px 4px rgba(0,0,0,0.2), inset 2px 2px 4px rgba(255,255,255,0.3);transform-style:preserve-3d}
+  .sign-panel::before{content:'';position:absolute;top:-4px;left:-4px;right:-4px;bottom:-4px;border:2px solid rgba(255,255,255,0.3);border-radius:8px;pointer-events:none}
+  .sign-shadow{position:absolute;bottom:-5px;left:50%;transform:translateX(-50%);width:60px;height:10px;background:radial-gradient(ellipse at center, rgba(0,0,0,0.4) 0%, transparent 70%);border-radius:50%}
+  
+  .ar-device-label{position:absolute;bottom:-25px;left:50%;transform:translateX(-50%);background:rgba(17,24,39,0.95);color:#fff;padding:3px 8px;border-radius:6px;font-size:11px;white-space:nowrap;font-weight:bold;border:1px solid rgba(96,165,250,0.5);box-shadow:0 2px 6px rgba(0,0,0,0.8)}
+  .ar-device.placed{opacity:0.4;filter:grayscale(0.5)}
+  
+  /* Ground reference line */
+  .ar-ground-line{position:absolute;left:0;right:0;height:2px;background:rgba(34,197,94,0.5);box-shadow:0 0 10px rgba(34,197,94,0.5);pointer-events:none}
+  
+  .ar-snap{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:var(--success);color:#000;padding:24px 40px;border-radius:16px;font-size:24px;font-weight:bold;border:4px solid #fff;box-shadow:0 8px 24px rgba(0,0,0,0.8);animation:snapPulse 0.5s ease;z-index:100}
   @keyframes snapPulse{0%,100%{transform:translate(-50%,-50%) scale(1)} 50%{transform:translate(-50%,-50%) scale(1.1)}}
   .ar-controls{position:absolute;bottom:20px;left:50%;transform:translateX(-50%);display:flex;gap:12px}
   .ar-controls button{padding:12px 24px;border-radius:12px;border:2px solid var(--accent);background:rgba(17,24,39,0.9);color:var(--text);font-weight:bold;font-size:14px;cursor:pointer;backdrop-filter:blur(10px)}
@@ -528,7 +551,7 @@
       <div style="flex-basis:100%;text-align:center;font-size:10px;color:var(--muted);margin-top:4px">
         💡 Use filter buttons to focus on device types<br>
         🔊 Audio alerts play when you arrive (within 10 ft)<br>
-        📷 AR Mode shows live camera with directional guidance
+        📷 AR Mode shows 3D cones/signs on ground exactly where they belong
       </div>
     </div>
   </div>
@@ -540,6 +563,7 @@
       <div class="ar-hud">
         <div class="ar-distance" id="arDistance">—</div>
         <div class="ar-direction" id="arDirection">Initializing...</div>
+        <div class="ar-tip">📱 Point camera at ground to see placement spots</div>
       </div>
       <div id="arDeviceContainer"></div>
       <div class="ar-reticle"></div>
@@ -1660,6 +1684,8 @@ let arActive = false;
 let arStream = null;
 let arUpdateInterval = null;
 let deviceOrientation = 0;
+let devicePitch = 0; // Phone tilt angle (looking up/down)
+let deviceRoll = 0; // Phone rotation
 
 // Initialize Web Audio API for sounds
 function initAudio(){
@@ -1984,12 +2010,16 @@ function updateARDisplay(){
   const container = document.getElementById('arDeviceContainer');
   container.innerHTML = '';
   
-  // Camera field of view (approximate)
-  const fovDegrees = 60; // Most phone cameras are 60-70 degrees
+  // Camera parameters
   const screenWidth = window.innerWidth;
   const screenHeight = window.innerHeight;
+  const fovHorizontal = 60; // Horizontal field of view in degrees
+  const fovVertical = 45; // Vertical field of view in degrees
   
-  // Render all nearby visible devices
+  // Average human eye height when holding phone: ~5 feet
+  const eyeHeight = 5;
+  
+  // Render all nearby visible devices with ground projection
   fieldDevices.forEach((device, idx) => {
     if (!isDeviceVisible(device)) return;
     
@@ -2003,7 +2033,7 @@ function updateARDisplay(){
     
     // Calculate distance
     const distM = turf.distance(userPt, devicePt, {units: 'meters'});
-    const distFt = Math.round(distM / FT_TO_M);
+    const distFt = distM / FT_TO_M;
     
     // Only show devices within 150 feet
     if (distFt > 150) return;
@@ -2016,26 +2046,47 @@ function updateARDisplay(){
     if (relativeBearing < -180) relativeBearing += 360;
     if (relativeBearing > 180) relativeBearing -= 360;
     
-    // Only show devices in camera view (within FOV)
-    const halfFov = fovDegrees / 2;
-    if (Math.abs(relativeBearing) > halfFov) return;
+    // Only show devices in camera horizontal FOV
+    const halfFovH = fovHorizontal / 2;
+    if (Math.abs(relativeBearing) > halfFovH) return;
     
-    // Calculate screen position
-    const xPercent = (relativeBearing / fovDegrees) * 100;
-    const xPos = (screenWidth / 2) + (xPercent / 100 * screenWidth);
+    // Calculate horizontal screen position
+    const xPercent = relativeBearing / fovHorizontal;
+    const xPos = (screenWidth / 2) + (xPercent * screenWidth);
     
-    // Vertical position based on distance (closer = lower on screen)
-    // This simulates perspective
-    const maxDist = 150;
-    const minY = screenHeight * 0.3; // Far objects at 30% from top
-    const maxY = screenHeight * 0.7; // Close objects at 70% from top
-    const distRatio = Math.min(distFt / maxDist, 1);
-    const yPos = minY + ((1 - distRatio) * (maxY - minY));
+    // GROUND PLANE PROJECTION
+    // Calculate where device appears vertically based on:
+    // 1. Distance from user
+    // 2. Camera pitch (tilt angle)
+    // 3. Perspective projection onto ground
+    
+    // Pitch: 90 = phone upright (looking forward), 0 = phone flat (looking down)
+    // Typical AR usage: 45-75 degrees (looking slightly down at ground)
+    const pitchDeg = devicePitch;
+    
+    // Calculate angle from camera to ground object
+    // Using simplified perspective: tan(angle) = height / distance
+    const angleToGround = Math.atan(eyeHeight / distFt) * (180 / Math.PI);
+    
+    // Where object appears relative to camera center
+    // If camera points down (low pitch), nearby objects appear lower on screen
+    // If camera points forward (high pitch), objects appear higher (toward horizon)
+    const cameraLookAngle = 90 - pitchDeg; // How far down from horizontal camera is tilted
+    const objectAngleFromCenter = cameraLookAngle - angleToGround;
+    
+    // Convert to screen position
+    // Vertical FOV determines how many degrees fit on screen
+    const yPercent = objectAngleFromCenter / fovVertical;
+    const yPos = (screenHeight / 2) - (yPercent * screenHeight);
+    
+    // Don't show if off-screen vertically
+    if (yPos < -50 || yPos > screenHeight + 50) return;
     
     // Scale based on distance (closer = bigger)
-    const minScale = 0.3;
-    const maxScale = 1.5;
-    const scale = maxScale - ((distRatio) * (maxScale - minScale));
+    // Use perspective scaling: apparent size = actual size / distance
+    const baseSize = 40; // Base icon size in pixels
+    const scaleFactor = 150 / Math.max(distFt, 10); // Scale factor based on reference distance
+    const scale = Math.min(scaleFactor, 3); // Cap maximum scale
     
     // Create device icon
     const deviceDiv = document.createElement('div');
@@ -2052,20 +2103,29 @@ function updateARDisplay(){
     
     deviceDiv.style.left = `${xPos}px`;
     deviceDiv.style.top = `${yPos}px`;
-    deviceDiv.style.transform = `translate(-50%, -50%) scale(${scale})`;
+    deviceDiv.style.transform = `translate(-50%, -100%) scale(${scale})`; // -100% to anchor at bottom
+    
+    // Show distance only if not too close
+    const showDist = distFt >= 5;
     
     if (isCone){
       deviceDiv.innerHTML = `
-        <div class="ar-cone-icon">
-          <div class="ar-cone-shape"></div>
-          <div class="ar-cone-base"></div>
-          <div class="ar-device-label">${distFt}ft</div>
+        <div class="ar-cone-3d">
+          <div class="cone-shadow"></div>
+          <div class="cone-base-3d"></div>
+          <div class="cone-body"></div>
+          <div class="cone-stripe"></div>
+          ${showDist ? `<div class="ar-device-label">${Math.round(distFt)}ft</div>` : ''}
         </div>
       `;
     } else {
       deviceDiv.innerHTML = `
-        <div class="ar-sign-icon">🚸</div>
-        <div class="ar-device-label">${distFt}ft</div>
+        <div class="ar-sign-3d">
+          <div class="sign-shadow"></div>
+          <div class="sign-post"></div>
+          <div class="sign-panel">🚸</div>
+          ${showDist ? `<div class="ar-device-label">${Math.round(distFt)}ft</div>` : ''}
+        </div>
       `;
     }
     
@@ -2078,7 +2138,6 @@ function updateARDisplay(){
   
   const deviceLat = device.a || device.lat;
   const deviceLng = device.o || device.lng;
-  const deviceName = device.n || device.name || 'Device';
   
   const devicePt = turf.point([deviceLng, deviceLat]);
   
@@ -2092,7 +2151,7 @@ function updateARDisplay(){
   // Update distance display
   document.getElementById('arDistance').textContent = `${distFt} ft`;
   
-  // Calculate relative bearing (accounting for device orientation)
+  // Calculate relative bearing
   let relativeBearing = bearing - deviceOrientation;
   if (relativeBearing < -180) relativeBearing += 360;
   if (relativeBearing > 180) relativeBearing -= 360;
@@ -2591,6 +2650,17 @@ function handleOrientation(event){
   if (event.alpha !== null){
     userHeading = event.alpha; // Device compass heading
     deviceOrientation = event.alpha; // Store for AR mode too
+  }
+  
+  // Beta = pitch (tilting phone forward/back) -180 to 180
+  // 0 = flat, 90 = standing upright, -90 = upside down
+  if (event.beta !== null){
+    devicePitch = event.beta;
+  }
+  
+  // Gamma = roll (tilting phone left/right) -90 to 90
+  if (event.gamma !== null){
+    deviceRoll = event.gamma;
   }
   
   // Also use webkitCompassHeading on iOS if available
