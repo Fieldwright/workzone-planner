@@ -2441,8 +2441,8 @@ function serializeWorkZone(){
     devices.push({
       t: 'c',
       n: m.options.title || 'Cone',
-      a: parseFloat(ll.lat.toFixed(6)),
-      o: parseFloat(ll.lng.toFixed(6)),
+      a: parseFloat(ll.lat.toFixed(5)),
+      o: parseFloat(ll.lng.toFixed(5)),
       p: false
     });
   });
@@ -2458,8 +2458,8 @@ function serializeWorkZone(){
       devices.push({
         t: 's',
         n: name,
-        a: parseFloat(ll.lat.toFixed(6)),
-        o: parseFloat(ll.lng.toFixed(6)),
+        a: parseFloat(ll.lat.toFixed(5)),
+        o: parseFloat(ll.lng.toFixed(5)),
         p: false
       });
     }
@@ -2469,8 +2469,8 @@ function serializeWorkZone(){
   if (line){
     const gj = line.toGeoJSON();
     polylineCoords = gj.geometry.coordinates.map(c => [
-      parseFloat(c[0].toFixed(6)),
-      parseFloat(c[1].toFixed(6))
+      parseFloat(c[0].toFixed(5)),
+      parseFloat(c[1].toFixed(5))
     ]);
   }
   
@@ -2529,7 +2529,12 @@ function generateQRCode(){
   console.log('QR URL length:', fieldUrl.length);
   
   // Warn if URL is very long (might have scanning issues)
-  if (fieldUrl.length > 2000){
+  if (fieldUrl.length > 1500){
+    const warning = document.createElement('div');
+    warning.style.cssText = 'color:#ef4444;font-size:11px;padding:8px;background:rgba(239,68,68,0.1);border-radius:6px;margin-bottom:8px;text-align:center;font-weight:bold;';
+    warning.innerHTML = `⚠️ URL too long (${fieldUrl.length} chars)<br>Reduce devices or try "Copy URL" button below`;
+    qrContainer.appendChild(warning);
+  } else if (fieldUrl.length > 1000){
     const warning = document.createElement('div');
     warning.style.cssText = 'color:#f59e0b;font-size:11px;padding:8px;background:rgba(245,158,11,0.1);border-radius:6px;margin-bottom:8px;';
     warning.innerHTML = '⚠️ Large project - QR code may be difficult to scan. Consider fewer devices.';
@@ -2537,11 +2542,11 @@ function generateQRCode(){
   }
   
   try {
-    // Create QR code using QRious
+    // Create QR code using QRious with lower error correction for better scanning
     const qr = new QRious({
       value: fieldUrl,
-      size: 256,
-      level: 'M',
+      size: 300,
+      level: 'L',
       background: 'white',
       foreground: 'black'
     });
@@ -2558,6 +2563,10 @@ function generateQRCode(){
     instruction.style.cssText = 'margin-top:12px;font-size:11px;color:#9ca3af;text-align:center;line-height:1.5';
     instruction.innerHTML = '📱 <strong>Scan with iPhone Camera</strong><br>Point camera at QR code and tap the notification';
     qrContainer.appendChild(instruction);
+    
+    // Show URL length for debugging
+    console.log('QR URL:', fieldUrl);
+    console.log('QR URL length:', fieldUrl.length);
     
   } catch(e){
     console.error('QR code generation error:', e);
@@ -2631,18 +2640,23 @@ function showQRPreview(){
   console.log('Preview QR URL length:', fieldUrl.length);
   
   // Warn if URL is very long
-  if (fieldUrl.length > 2000){
+  if (fieldUrl.length > 1500){
+    const warning = document.createElement('div');
+    warning.style.cssText = 'color:#ef4444;font-size:12px;padding:10px;background:rgba(239,68,68,0.1);border-radius:6px;margin-bottom:12px;text-align:center;font-weight:bold;';
+    warning.innerHTML = `⚠️ URL TOO LONG (${fieldUrl.length} characters)<br><br>This QR code will be difficult or impossible to scan.<br><br><strong>Solutions:</strong><br>• Use "Copy URL" button and text it to your phone<br>• Reduce number of devices<br>• Create multiple smaller work zones`;
+    qrContainer.appendChild(warning);
+  } else if (fieldUrl.length > 1000){
     const warning = document.createElement('div');
     warning.style.cssText = 'color:#f59e0b;font-size:12px;padding:10px;background:rgba(245,158,11,0.1);border-radius:6px;margin-bottom:12px;text-align:center';
-    warning.innerHTML = '⚠️ Large project detected. QR code may be difficult to scan.<br>Consider placing fewer devices for easier scanning.';
+    warning.innerHTML = `⚠️ Large project (${fieldUrl.length} characters)<br>QR code may be difficult to scan. Try the "Copy URL" button if scanning fails.`;
     qrContainer.appendChild(warning);
   }
   
   try {
     const qr = new QRious({
       value: fieldUrl,
-      size: 280,
-      level: 'M',
+      size: 320,
+      level: 'L',
       background: 'white',
       foreground: 'black'
     });
@@ -2658,6 +2672,12 @@ function showQRPreview(){
     instruction.style.cssText = 'margin-top:16px;font-size:12px;color:var(--muted);text-align:center;line-height:1.6';
     instruction.innerHTML = '📱 <strong>To scan:</strong><br>Open iPhone Camera app and point at QR code<br>Tap the notification that appears';
     qrContainer.appendChild(instruction);
+    
+    // Show data size info
+    const sizeInfo = document.createElement('div');
+    sizeInfo.style.cssText = 'margin-top:8px;font-size:10px;color:var(--muted);text-align:center';
+    sizeInfo.textContent = `URL length: ${fieldUrl.length} characters`;
+    qrContainer.appendChild(sizeInfo);
     
     // Add copy URL button
     const copyBtn = document.createElement('button');
@@ -2676,6 +2696,10 @@ function showQRPreview(){
     qrContainer.appendChild(copyBtn);
     
     modal.classList.add('active');
+    
+    console.log('QR Preview URL:', fieldUrl);
+    console.log('QR Preview URL length:', fieldUrl.length);
+    
   } catch(e){
     console.error('QR code generation error:', e);
     alert('Error generating QR code: ' + e.message);
