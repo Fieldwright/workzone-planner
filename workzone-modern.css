@@ -1,0 +1,147 @@
+<script>
+/* Work Zone Planner – Display Menu (themes + compact + a11y)
+   Drop-in: add at the end of your JS. No HTML changes required. */
+
+(() => {
+  const THEMES = ['dark','light','orange','slate'];
+  const THEME_ICONS = { dark:'🌙', light:'☀️', orange:'🟧', slate:'🧊' };
+
+  // ---- state helpers ----
+  const get = (k, d) => JSON.parse(localStorage.getItem(k) ?? 'null') ?? d;
+  const set = (k, v) => localStorage.setItem(k, JSON.stringify(v));
+
+  function applyPrefs() {
+    const theme = get('wzp_theme', 'dark');
+    const compact = !!get('wzp_compact', false);
+    const focus = !!get('wzp_focus', false);
+
+    // Theme -> body attributes/classes
+    document.body.classList.toggle('light-mode', theme === 'light');
+    if (theme === 'dark') document.body.removeAttribute('data-theme');
+    if (theme === 'orange') document.body.setAttribute('data-theme', 'orange');
+    if (theme === 'slate') document.body.setAttribute('data-theme', 'slate');
+    if (theme === 'dark' || theme === 'light') {
+      // remove palette attr if using base themes
+      if (theme !== 'orange' && theme !== 'slate') document.body.removeAttribute('data-theme');
+    }
+
+    // Compact & focus
+    document.body.classList.toggle('compact', compact);
+    if (focus) document.body.setAttribute('data-focus','strong'); else document.body.removeAttribute('data-focus');
+
+    // reflect in UI if menu exists
+    const themeBtn = document.getElementById('wzpThemeCycle');
+    if (themeBtn) themeBtn.textContent = `${THEME_ICONS[theme] || '🎨'} ${theme}`;
+    const compactChk = document.getElementById('wzpCompact');
+    if (compactChk) compactChk.checked = compact;
+    const focusChk = document.getElementById('wzpFocus');
+    if (focusChk) focusChk.checked = focus;
+
+    // try to keep your old themeToggle icon sensible
+    const legacy = document.getElementById('themeToggle');
+    if (legacy) legacy.textContent = (theme === 'light') ? '☀️' : '🌙';
+  }
+
+  // ---- create floating display button + popover ----
+  function createDisplayMenu() {
+    // container
+    const tray = document.createElement('div');
+    tray.id = 'wzpDisplayTray';
+    tray.style.position = 'fixed';
+    tray.style.top = '10px';
+    tray.style.right = '56px';
+    tray.style.zIndex = '2001';
+    tray.style.display = 'flex';
+    tray.style.gap = '8px';
+    document.body.appendChild(tray);
+
+    // toggle button
+    const btn = document.createElement('button');
+    btn.id = 'wzpDisplayBtn';
+    btn.title = 'Display options';
+    btn.textContent = '🎛';
+    Object.assign(btn.style, {
+      padding:'8px 10px', border:'0', borderRadius:'10px', cursor:'pointer',
+      fontWeight:'700', background:'var(--panel)', color:'var(--text)',
+      boxShadow:'0 10px 30px rgba(3,8,20,.25)', border:'1px solid var(--border)'
+    });
+    tray.appendChild(btn);
+
+    // popover
+    const pop = document.createElement('div');
+    pop.id = 'wzpDisplayPop';
+    Object.assign(pop.style, {
+      position:'absolute', right:'0', top:'48px', minWidth:'220px',
+      background:'var(--panel)', color:'var(--text)', border:'1px solid var(--border)',
+      borderRadius:'12px', boxShadow:'0 20px 40px rgba(3,8,20,.45)', padding:'10px',
+      display:'none'
+    });
+    pop.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <strong>Display</strong>
+        <button id="wzpThemeCycle" class="secondary" style="padding:6px 8px;border-radius:8px;border:1px solid var(--border);background:var(--panel-2);color:var(--text);cursor:pointer">🎨 theme</button>
+      </div>
+      <label style="display:flex;align-items:center;gap:8px;font-size:13px;margin:6px 0">
+        <input id="wzpCompact" type="checkbox"> Compact field mode
+      </label>
+      <label style="display:flex;align-items:center;gap:8px;font-size:13px;margin:6px 0">
+        <input id="wzpFocus" type="checkbox"> Strong focus rings (a11y)
+      </label>
+      <div style="margin-top:6px;font-size:11px;color:var(--muted)">Shortcuts: T = theme • G = compact</div>
+    `;
+    tray.appendChild(pop);
+
+    // interactions
+    btn.addEventListener('click', () => {
+      pop.style.display = (pop.style.display === 'none') ? 'block' : 'none';
+    });
+    document.addEventListener('click', (e) => {
+      if (!pop.contains(e.target) && e.target !== btn) pop.style.display = 'none';
+    });
+
+    // controls
+    pop.querySelector('#wzpThemeCycle').addEventListener('click', () => {
+      const current = get('wzp_theme', 'dark');
+      const idx = THEMES.indexOf(current);
+      const next = THEMES[(idx + 1) % THEMES.length];
+      set('wzp_theme', next);
+      applyPrefs();
+    });
+    pop.querySelector('#wzpCompact').addEventListener('change', (e) => {
+      set('wzp_compact', !!e.target.checked);
+      applyPrefs();
+    });
+    pop.querySelector('#wzpFocus').addEventListener('change', (e) => {
+      set('wzp_focus', !!e.target.checked);
+      applyPrefs();
+    });
+  }
+
+  // ---- keyboard shortcuts ----
+  function bindShortcuts() {
+    document.addEventListener('keydown', (e) => {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+      if (e.key.toLowerCase() === 't') {
+        const current = get('wzp_theme', 'dark');
+        const idx = THEMES.indexOf(current);
+        const next = THEMES[(idx + 1) % THEMES.length];
+        set('wzp_theme', next); applyPrefs();
+      }
+      if (e.key.toLowerCase() === 'g') {
+        const cur = !!get('wzp_compact', false);
+        set('wzp_compact', !cur); applyPrefs();
+      }
+    });
+  }
+
+  // ---- boot ----
+  // upgrade any legacy saved theme so your old toggle isn't lost
+  const legacy = localStorage.getItem('theme'); // 'light' or 'dark'
+  if (legacy && !localStorage.getItem('wzp_theme')) {
+    set('wzp_theme', legacy === 'light' ? 'light' : 'dark');
+  }
+  applyPrefs();
+  createDisplayMenu();
+  bindShortcuts();
+})();
+</script>
