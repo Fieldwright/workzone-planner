@@ -422,7 +422,7 @@
 <script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
 <script src="https://unpkg.com/@turf/turf@6.5.0/turf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/tokml/0.4.0/tokml.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js"></script>
 
 <script>
 const FT_TO_M = 0.3048;
@@ -1194,6 +1194,13 @@ function showQRPreview(){
     return;
   }
   
+  // Check if QRious library is loaded
+  if (typeof QRious === 'undefined'){
+    alert('QR Code library failed to load. Please refresh the page and try again.');
+    console.error('QRious library not loaded');
+    return;
+  }
+  
   const modal = document.getElementById('qrModal');
   const qrContainer = document.getElementById('qrPreview');
   qrContainer.innerHTML = '';
@@ -1205,16 +1212,18 @@ function showQRPreview(){
   const fieldUrl = `${baseUrl}#field=${encoded}`;
   
   console.log('Preview QR URL length:', fieldUrl.length);
+  console.log('Full URL:', fieldUrl);
   
   try {
-    new QRCode(qrContainer, {
-      text: fieldUrl,
-      width: 256,
-      height: 256,
-      colorDark: "#000000",
-      colorLight: "#ffffff",
-      correctLevel: QRCode.CorrectLevel.H // High error correction
+    const qr = new QRious({
+      value: fieldUrl,
+      size: 256,
+      level: 'H' // High error correction
     });
+    
+    qrContainer.appendChild(qr.canvas);
+    qr.canvas.style.display = 'block';
+    qr.canvas.style.margin = '0 auto';
     
     // Show URL below for manual testing
     const urlDisplay = document.createElement('div');
@@ -1225,7 +1234,7 @@ function showQRPreview(){
     modal.classList.add('active');
   } catch(e){
     console.error('QR code generation error:', e);
-    alert('Error generating QR code. Please try again.');
+    alert('Error generating QR code: ' + e.message);
   }
 }
 
