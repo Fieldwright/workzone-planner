@@ -1,0 +1,1860 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Work Zone Planner Pro - Enhanced Edition</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css">
+<style>
+  :root { --bg:#0b1020; --panel:#111827; --muted:#9ca3af; --text:#e5e7eb; --accent:#60a5fa; --success:#22c55e; --warn:#f59e0b; --danger:#ef4444; }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font:13px/1.25 system-ui,Segoe UI,Arial}
+  #app{display:grid;grid-template-columns:380px 1fr;min-height:100vh}
+  aside{background:var(--panel);padding:10px 12px;border-right:1px solid #1f2937;overflow-y:auto;overflow-x:hidden;max-height:100vh}
+  h1{font-size:16px;margin:0 0 4px;display:flex;align-items:center;gap:6px}
+  .badge{display:inline-block;background:var(--accent);color:#000;padding:1px 5px;border-radius:4px;font-size:9px;font-weight:bold}
+  .sub{color:var(--muted);font-size:11px;margin-bottom:8px;line-height:1.4}
+  
+  /* Collapsible sections */
+  .section{margin:10px 0;border:1px solid #1f2937;border-radius:8px;overflow:hidden}
+  .section-header{background:#1a2332;padding:8px 10px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;user-select:none}
+  .section-header:hover{background:#1f2937}
+  .section-title{font-weight:600;font-size:13px;display:flex;align-items:center;gap:6px}
+  .section-icon{font-size:10px;transition:transform 0.2s}
+  .section-icon.collapsed{transform:rotate(-90deg)}
+  .section-content{padding:10px;display:block}
+  .section-content.collapsed{display:none}
+  
+  label{display:block;margin:4px 0 2px;color:#cbd5e1;font-size:12px;display:flex;align-items:center;gap:4px}
+  .tooltip{color:var(--muted);cursor:help;font-size:10px}
+  input[type="number"],input[type="text"]{width:100%;padding:6px 8px;border-radius:8px;border:1px solid #253041;background:#0b1220;color:#e5e7eb;font-size:12px}
+  .row{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px}
+  .row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:6px}
+  .btns{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:6px}
+  .btns3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-top:6px}
+  button{cursor:pointer;padding:8px;border:0;border-radius:10px;background:var(--accent);color:#03122a;font-weight:600;font-size:12px;transition:opacity 0.2s}
+  button:hover{opacity:0.9}
+  button.secondary{background:#374151;color:#e5e7eb}
+  button.warn{background:var(--warn);color:#000}
+  button.danger{background:var(--danger);color:#fff}
+  button:disabled{opacity:0.5;cursor:not-allowed}
+  .stat{margin-top:4px;font-size:12px;color:#cbd5e1;padding:4px 6px;background:#0b1220;border-radius:6px}
+  .stat strong{color:var(--accent)}
+  .hr{border-top:1px solid #1f2937;margin:8px 0}
+  #map{height:100vh;width:100%}
+  
+  /* Icons */
+  .cone {width:0;height:0;border-left:8px solid transparent;border-right:8px solid transparent;border-bottom:20px solid #ff6a00;position:relative;transform:translate(-8px,-20px);filter:drop-shadow(0 1px 0 #7a2d00);}
+  .cone:after {content:"";position:absolute;left:-10px;bottom:-5px;width:20px;height:5px;background:#7a2d00;border-radius:3px;}
+  .station-label {background:#1e293b;color:white;padding:1px 4px;border-radius:3px;font-size:10px;font-weight:bold;white-space:nowrap;border:1px solid #475569}
+  .sign-pill {display:inline-flex;align-items:center;gap:6px;padding:4px 6px;border-radius:8px;background:#facc15;color:#111827;border:2px solid #000;box-shadow:0 1px 0 rgba(0,0,0,.6);font-weight:700;user-select:none;cursor:grab;font-size:10px;line-height:1.1}
+  .sign-palette {display:grid;grid-template-columns:1fr 1fr;gap:6px;max-height:300px;overflow-y:auto;padding:4px}
+  .radio-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:12px;margin:4px 0}
+  .radio-row label{display:flex;gap:4px;align-items:center;color:#e5e7eb;margin:0}
+  .topline{display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:8px}
+  .topline .inline-btns{display:flex;gap:6px}
+  .chk-row{display:flex;gap:6px;align-items:center;color:#e5e7eb;font-size:12px;margin:4px 0}
+  .handle{background:#111827;border:1px solid #475569;color:#e5e7eb;border-radius:6px;padding:2px 6px;font-size:10px;margin-top:4px}
+  .rot-toolbar{background:#111827;border:1px solid #475569;color:#e5e7eb;border-radius:6px;padding:2px 4px;font-size:11px;display:flex;gap:6px;align-items:center}
+  .rot-btn{background:#374151;color:#e5e7eb;border-radius:4px;border:1px solid #64748b;padding:1px 4px;cursor:pointer}
+
+  /* Arrow board animation */
+  @keyframes arrow-blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+  }
+  .arrow-board{background:#000;border:3px solid #f59e0b;padding:4px;border-radius:4px;display:flex;gap:2px}
+  .arrow-segment{width:6px;height:20px;background:#f59e0b;animation:arrow-blink 0.5s infinite}
+  .arrow-segment:nth-child(2){animation-delay:0.15s}
+  .arrow-segment:nth-child(3){animation-delay:0.3s}
+
+  /* Compliance badges */
+  .taper-badge {background:var(--success);color:white;padding:2px 6px;border-radius:4px;font-size:11px;font-weight:bold;white-space:nowrap;}
+  .taper-badge.short {background:var(--danger);}
+  .taper-badge.warning {background:var(--warn);color:#000}
+  .leaflet-popup-content-wrapper.dark-popup {background:#111827;color:#e5e7eb;border:1px solid #475569;border-radius:8px;}
+  .leaflet-popup-tip.dark-popup {background:#111827;}
+
+  /* Measurement tool */
+  .measure-line{stroke:#22c55e;stroke-width:3;stroke-dasharray:5,5}
+  .measure-label{background:var(--success);color:#000;padding:2px 6px;border-radius:4px;font-size:11px;font-weight:bold}
+
+  /* Mobile responsive */
+  @media (max-width: 768px) {
+    #app{grid-template-columns:1fr;position:relative}
+    aside{position:absolute;top:0;left:0;width:100%;max-width:350px;z-index:1000;max-height:80vh;box-shadow:2px 0 10px rgba(0,0,0,0.5)}
+    aside.mobile-hidden{transform:translateX(-100%);transition:transform 0.3s}
+    .mobile-toggle{display:block !important;position:absolute;top:10px;left:10px;z-index:1001;background:var(--panel);border:1px solid #475569;padding:8px 12px;border-radius:8px;cursor:pointer}
+    #map{height:100vh}
+  }
+  .mobile-toggle{display:none}
+
+  /* Print styles */
+  .print-panel{display:none}
+  @media print{
+    body{background:white;color:black}
+    #app{grid-template-columns:1fr}
+    aside,.mobile-toggle{display:none}
+    #map{height:7in;page-break-after:always}
+    .print-panel{display:block;padding:12px;page-break-before:always}
+    .print-panel h2{margin:8px 0 6px;font-size:18px;border-bottom:2px solid #000;padding-bottom:4px}
+    .print-panel h3{margin:10px 0 4px;font-size:14px}
+    .print-panel .cols{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+    .print-panel table{width:100%;border-collapse:collapse;margin:8px 0;font-size:12px}
+    .print-panel th{background:#e5e7eb;padding:4px 8px;text-align:left;border:1px solid #000}
+    .print-panel td{padding:4px 8px;border:1px solid #000}
+    .qr-section{margin-top:16px;padding:12px;border:2px solid #000;text-align:center}
+    .qr-section h3{margin-top:0}
+  }
+
+  /* Field View (Mobile) */
+  #fieldView{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:var(--bg);z-index:10000}
+  #fieldView.active{display:flex;flex-direction:column}
+  #fieldViewMap{flex:1;width:100%;position:relative}
+  .field-header{background:var(--panel);padding:12px;border-bottom:2px solid var(--accent);box-shadow:0 2px 8px rgba(0,0,0,0.3)}
+  .field-header h2{margin:0 0 4px;font-size:18px;color:var(--accent)}
+  .field-header .info{font-size:12px;color:var(--muted)}
+  
+  /* Navigation Panel */
+  .nav-panel{position:absolute;top:10px;left:10px;right:10px;background:rgba(17,24,39,0.95);border-radius:12px;padding:12px;z-index:1000;border:2px solid var(--accent);box-shadow:0 4px 12px rgba(0,0,0,0.5);backdrop-filter:blur(10px)}
+  .nav-panel.hidden{display:none}
+  .nav-distance{font-size:32px;font-weight:bold;color:var(--accent);line-height:1;margin-bottom:4px}
+  .nav-direction{font-size:14px;color:var(--text);margin-bottom:8px;display:flex;align-items:center;gap:8px}
+  .nav-device{font-size:13px;color:var(--muted);border-top:1px solid #374151;padding-top:8px;margin-top:8px}
+  .nav-device strong{color:var(--text)}
+  
+  /* Compass Arrow */
+  .compass-container{position:absolute;top:120px;left:50%;transform:translateX(-50%);z-index:1000;pointer-events:none}
+  .compass-arrow{width:60px;height:60px;background:rgba(34,197,94,0.95);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:32px;box-shadow:0 4px 12px rgba(0,0,0,0.5);border:3px solid #fff;transition:transform 0.3s ease}
+  .compass-accuracy{background:rgba(17,24,39,0.9);color:var(--muted);padding:2px 8px;border-radius:4px;font-size:10px;text-align:center;margin-top:4px}
+  
+  /* Guidance Path */
+  .guidance-line{stroke:#22c55e;stroke-width:3;stroke-dasharray:8,8;stroke-linecap:round;opacity:0.8;animation:dashMove 1s linear infinite}
+  @keyframes dashMove{to{stroke-dashoffset:-16}}
+  
+  .field-controls{background:var(--panel);padding:10px;border-top:1px solid #1f2937;display:flex;gap:8px;flex-wrap:wrap}
+  .field-controls button{flex:1;min-width:120px}
+  .device-popup{font-size:13px;line-height:1.5}
+  .device-popup strong{color:var(--accent);display:block;margin-bottom:4px;font-size:14px}
+  .device-popup .coord{color:var(--muted);font-size:11px;font-family:monospace}
+  .placement-marker{background:var(--success);color:#000;padding:4px 8px;border-radius:6px;font-weight:bold;font-size:11px;border:2px solid #000;box-shadow:0 2px 4px rgba(0,0,0,0.3)}
+  .placement-marker.placed{background:#6b7280;opacity:0.5}
+  
+  /* Arrival notification */
+  .arrival-banner{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:var(--success);color:#000;padding:20px 30px;border-radius:12px;font-size:20px;font-weight:bold;z-index:2000;box-shadow:0 8px 24px rgba(0,0,0,0.5);animation:popIn 0.3s ease;border:4px solid #fff}
+  @keyframes popIn{from{transform:translate(-50%,-50%) scale(0.5);opacity:0} to{transform:translate(-50%,-50%) scale(1);opacity:1}}
+
+  /* QR Preview Modal */
+  .modal{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.8);z-index:9999;align-items:center;justify-content:center}
+  .modal.active{display:flex}
+  .modal-content{background:var(--panel);border-radius:12px;padding:20px;max-width:400px;width:90%;border:2px solid var(--accent)}
+  .modal-header{font-size:18px;font-weight:bold;margin-bottom:12px;color:var(--accent)}
+  .modal-body{text-align:center}
+  .modal-footer{margin-top:16px;display:flex;gap:8px}
+  .modal-footer button{flex:1}
+</style>
+</head>
+<body>
+<button class="mobile-toggle" id="mobileToggle">☰ Menu</button>
+
+<div id="app">
+  <aside id="sidebar">
+    <div class="topline">
+      <h1>Work Zone Planner <span class="badge">PRO</span></h1>
+      <div class="inline-btns">
+        <button id="btn-place" title="Place Cones">Place</button>
+        <button id="btn-print" class="secondary" title="Generate & Print Plan">Print</button>
+      </div>
+    </div>
+    <div class="sub">Professional work zone planning with MUTCD compliance, advanced features, and comprehensive reporting.</div>
+
+    <!-- Project Info Section -->
+    <div class="section">
+      <div class="section-header" data-section="project">
+        <div class="section-title">📋 Project Information</div>
+        <span class="section-icon">▼</span>
+      </div>
+      <div class="section-content" data-section="project">
+        <label>Project Name</label>
+        <input id="projectName" type="text" placeholder="e.g., Main St Repairs">
+        <label style="margin-top:6px">Location</label>
+        <input id="projectLocation" type="text" placeholder="e.g., SR-123, Mile Marker 45">
+        <label style="margin-top:6px">Date</label>
+        <input id="projectDate" type="text" value="">
+      </div>
+    </div>
+
+    <!-- Speed & Spacing Section -->
+    <div class="section">
+      <div class="section-header" data-section="speed">
+        <div class="section-title">⚡ Speed & Spacing</div>
+        <span class="section-icon">▼</span>
+      </div>
+      <div class="section-content" data-section="speed">
+        <div class="row">
+          <div>
+            <label>Speed Limit (mph) <span class="tooltip" title="Posted speed limit">ℹ️</span></label>
+            <input id="speedLimit" type="number" value="35" min="10" max="80" step="5">
+          </div>
+          <div class="chk-row" style="align-self:end;justify-content:flex-start;padding-bottom:6px">
+            <input type="checkbox" id="autoFromSpeed" checked>
+            <label for="autoFromSpeed" style="margin:0">Auto buffer</label>
+          </div>
+        </div>
+
+        <div class="radio-row">
+          <label><input type="radio" name="taperMode" id="modeSingle" value="single" checked> Single</label>
+          <label><input type="radio" name="taperMode" id="modeDouble" value="double"> Double</label>
+          <span class="chk-row" style="margin-left:auto">
+            <input type="checkbox" id="chk-delete">
+            <label for="chk-delete" style="margin:0">Delete</label>
+          </span>
+        </div>
+
+        <div class="row">
+          <div>
+            <label>Taper spacing (ft)</label>
+            <input id="spacing" type="number" value="35" min="5" step="1">
+          </div>
+          <div>
+            <label>Buffer spacing (ft)</label>
+            <input id="bufferSpacing" type="number" value="70" min="10" step="5">
+          </div>
+        </div>
+        <div class="row">
+          <div>
+            <label>Icon scale</label>
+            <input id="scale" type="number" value="1" min="0.5" max="2" step="0.1">
+          </div>
+          <div>
+            <label>Station step (ft)</label>
+            <input id="stationStep" type="number" value="50" min="25" step="25">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tools Section -->
+    <div class="section">
+      <div class="section-header" data-section="tools">
+        <div class="section-title">🛠️ Tools</div>
+        <span class="section-icon">▼</span>
+      </div>
+      <div class="section-content" data-section="tools">
+        <div class="btns3">
+          <button id="btn-measure" class="secondary" title="Measure Distance">📏 Measure</button>
+          <button id="btn-clear-cones" class="secondary">Clear Cones</button>
+          <button id="btn-clear-all" class="danger">Reset All</button>
+        </div>
+        <div class="btns3" style="margin-top:6px">
+          <button id="btn-export-geojson" class="secondary">GeoJSON</button>
+          <button id="btn-export-kml" class="secondary">KML</button>
+          <button id="btn-export-csv" class="secondary">CSV</button>
+        </div>
+        <div style="margin-top:6px">
+          <button id="btn-preview-qr" class="secondary" style="width:100%">📱 Preview Field QR</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Signs Section -->
+    <div class="section">
+      <div class="section-header" data-section="signs">
+        <div class="section-title">🚧 Signs & Devices <span class="badge" id="signCount">0</span></div>
+        <span class="section-icon">▼</span>
+      </div>
+      <div class="section-content" data-section="signs">
+        <div id="palette" class="sign-palette">
+          <div class="sign-pill" draggable="true" data-sign="ROAD WORK AHEAD">ROAD WORK AHEAD</div>
+          <div class="sign-pill" draggable="true" data-sign="ONE LANE ROAD AHEAD">ONE LANE ROAD</div>
+          <div class="sign-pill" draggable="true" data-sign="FLAGGER AHEAD">FLAGGER AHEAD</div>
+          <div class="sign-pill" draggable="true" data-sign="FLAGGER">FLAGGER</div>
+          <div class="sign-pill" draggable="true" data-sign="BE PREPARED TO STOP">PREP TO STOP</div>
+          <div class="sign-pill" draggable="true" data-sign="DETOUR">DETOUR</div>
+          <div class="sign-pill" draggable="true" data-sign="END ROAD WORK">END ROAD WORK</div>
+          <div class="sign-pill" draggable="true" data-sign="LEFT LANE CLOSED">LEFT CLOSED</div>
+          <div class="sign-pill" draggable="true" data-sign="RIGHT LANE CLOSED">RIGHT CLOSED</div>
+          <div class="sign-pill" draggable="true" data-sign="MERGE LEFT">MERGE LEFT</div>
+          <div class="sign-pill" draggable="true" data-sign="MERGE RIGHT">MERGE RIGHT</div>
+          <div class="sign-pill" draggable="true" data-sign="SHOULDER WORK">SHOULDER WORK</div>
+          <div class="sign-pill" draggable="true" data-sign="UTILITY WORK">UTILITY WORK</div>
+          <div class="sign-pill" draggable="true" data-sign="ROAD CLOSED">ROAD CLOSED</div>
+          <div class="sign-pill" draggable="true" data-sign="PED XING">PED XING</div>
+          <div class="sign-pill" draggable="true" data-sign="SPEED LIMIT 25">SPEED 25</div>
+          <div class="sign-pill" draggable="true" data-sign="SPEED LIMIT 35">SPEED 35</div>
+          <div class="sign-pill" draggable="true" data-sign="SPEED LIMIT 45">SPEED 45</div>
+          <div class="sign-pill" draggable="true" data-sign="BARRICADE 8 FT">BARRICADE 8FT</div>
+          <div class="sign-pill" draggable="true" data-sign="ARROW BOARD">ARROW BOARD</div>
+          <div class="sign-pill" draggable="true" data-sign="CHANGEABLE MESSAGE">MSG SIGN</div>
+        </div>
+        <button id="btn-clear-signs" class="secondary" style="margin-top:6px;width:100%">Clear All Signs</button>
+      </div>
+    </div>
+
+    <!-- Statistics Section -->
+    <div class="section">
+      <div class="section-header" data-section="stats">
+        <div class="section-title">📊 Statistics & Compliance</div>
+        <span class="section-icon">▼</span>
+      </div>
+      <div class="section-content" data-section="stats">
+        <div class="stat" id="statProjectLength">Project Length: —</div>
+        <div class="stat" id="statTaperA">Taper A: —</div>
+        <div class="stat" id="statTaperB">Taper B: —</div>
+        <div class="stat" id="statBuffer">Buffer: —</div>
+        <div class="stat" id="statAdvWarning">Adv. Warning: —</div>
+        <div class="stat" id="statCones">Cones: <strong>0</strong></div>
+        <div class="stat" id="statSigns">Signs: <strong>0</strong></div>
+        <div class="stat" id="statEstCost" style="margin-top:8px;background:#1e293b">Est. Cost: <strong>—</strong></div>
+      </div>
+    </div>
+
+  </aside>
+
+  <div id="map"></div>
+</div>
+
+<!-- Print Panel -->
+<div class="print-panel" id="printPanel">
+  <h2>Traffic Management Plan</h2>
+  <div style="margin-bottom:12px;font-size:13px">
+    <div><strong>Project:</strong> <span id="ppProjectName">—</span></div>
+    <div><strong>Location:</strong> <span id="ppLocation">—</span></div>
+    <div><strong>Date:</strong> <span id="ppDate">—</span></div>
+    <div><strong>Speed Limit:</strong> <span id="ppSpeed">—</span> mph</div>
+  </div>
+
+  <div class="cols">
+    <div>
+      <h3>Device Inventory</h3>
+      <table id="printDeviceTable">
+        <thead><tr><th>Device</th><th>Quantity</th></tr></thead>
+        <tbody id="printDevices"></tbody>
+      </table>
+    </div>
+    <div>
+      <h3>Cone Placement Details</h3>
+      <table>
+        <tr><th>Taper Spacing</th><td id="ppTaperSpacing">—</td></tr>
+        <tr><th>Taper Cones</th><td id="ppTaperCones">0</td></tr>
+        <tr><th>Buffer Spacing</th><td id="ppBufferSpacing">—</td></tr>
+        <tr><th>Buffer Cones</th><td id="ppBufferCones">0</td></tr>
+        <tr><th>Total Cones</th><td id="ppTotalCones">0</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <h3>MUTCD Compliance Summary</h3>
+  <div id="ppCompliance" style="font-size:12px;line-height:1.6"></div>
+
+  <h3>Project Measurements</h3>
+  <div id="ppMeasurements" style="font-size:12px"></div>
+
+  <div class="qr-section">
+    <h3>📱 GPS-Guided Field Setup</h3>
+    <div style="margin:10px 0">
+      <div id="qrcode" style="display:inline-block"></div>
+    </div>
+    <p style="font-size:13px;margin:8px 0;max-width:500px;margin-left:auto;margin-right:auto;line-height:1.5">
+      <strong>Scan this QR code</strong> with your mobile device for GPS-guided placement:
+    </p>
+    <ul style="font-size:12px;text-align:left;max-width:500px;margin:8px auto;line-height:1.6">
+      <li><strong>Real-time navigation:</strong> Turn-by-turn directions to each device</li>
+      <li><strong>Distance tracking:</strong> Live distance updates in feet</li>
+      <li><strong>Compass guidance:</strong> Visual arrow pointing to target location</li>
+      <li><strong>Arrival alerts:</strong> Vibration and notification when within 10 feet</li>
+      <li><strong>Progress tracking:</strong> Mark devices as placed, auto-advance to next</li>
+    </ul>
+  </div>
+</div>
+
+<!-- Field View (Mobile) -->
+<div id="fieldView">
+  <div class="field-header">
+    <h2 id="fieldProjectName">Work Zone Setup</h2>
+    <div class="info" id="fieldProjectInfo">Loading project information...</div>
+  </div>
+  <div id="fieldViewMap">
+    <!-- Navigation Panel -->
+    <div id="navPanel" class="nav-panel hidden">
+      <div class="nav-distance" id="navDistance">—</div>
+      <div class="nav-direction" id="navDirection">
+        <span id="navArrowText">⬆️</span>
+        <span id="navDirectionText">Calculating route...</span>
+      </div>
+      <div class="nav-device" id="navDevice">
+        Target: <strong id="navDeviceName">—</strong>
+      </div>
+    </div>
+    
+    <!-- Compass Arrow -->
+    <div id="compassContainer" class="compass-container" style="display:none">
+      <div class="compass-arrow" id="compassArrow">⬆️</div>
+      <div class="compass-accuracy" id="compassAccuracy">Calculating...</div>
+    </div>
+  </div>
+  <div class="field-controls">
+    <button id="btnLocateMe" class="secondary">📍 Start GPS</button>
+    <button id="btnNextDevice" style="background:var(--accent)">→ Next Device</button>
+    <button id="btnExitField" class="secondary">Exit Setup</button>
+  </div>
+</div>
+
+<!-- QR Preview Modal -->
+<div id="qrModal" class="modal">
+  <div class="modal-content">
+    <div class="modal-header">📱 GPS-Guided Field Setup</div>
+    <div class="modal-body">
+      <div id="qrPreview"></div>
+      <p style="font-size:12px;margin:12px 0;color:var(--muted);line-height:1.5">
+        Scan this QR code with your mobile device to launch GPS-guided navigation. The field crew will get turn-by-turn directions, real-time distance tracking, and arrival notifications for every cone and sign placement location.
+      </p>
+    </div>
+    <div class="modal-footer">
+      <button id="btnCloseModal" class="secondary">Close</button>
+      <button id="btnCopyUrl" style="background:var(--accent)">Copy URL</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
+<script src="https://unpkg.com/@turf/turf@6.5.0/turf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/tokml/0.4.0/tokml.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+
+<script>
+const FT_TO_M = 0.3048;
+const LANE_WIDTH_FT = 12;
+
+// Device costs (rough estimates in USD)
+const DEVICE_COSTS = {
+  'Cone': 15,
+  'ROAD WORK AHEAD': 150,
+  'FLAGGER': 0, // personnel
+  'BARRICADE 8 FT': 75,
+  'ARROW BOARD': 2500,
+  'CHANGEABLE MESSAGE': 8000,
+  'default': 100
+};
+
+// Map
+const map = L.map('map', { minZoom: 3, maxZoom: 23 }).setView([39.5,-98.35], 5);
+L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+  attribution: 'Tiles © Esri', maxZoom: 23
+}).addTo(map);
+
+// Layers
+const drawnItems = new L.FeatureGroup().addTo(map);
+const coneLayer  = new L.FeatureGroup().addTo(map);
+const labelLayer = new L.FeatureGroup().addTo(map);
+const signLayer  = new L.FeatureGroup().addTo(map);
+const badgeLayer = new L.FeatureGroup().addTo(map);
+const measureLayer = new L.FeatureGroup().addTo(map);
+
+let line = null;
+let measureMode = false;
+let measurePoints = [];
+
+// Draw controls
+const drawControl = new L.Control.Draw({
+  edit: { featureGroup: drawnItems },
+  draw: { polygon:false, rectangle:false, circle:false, marker:false, circlemarker:false,
+    polyline:{shapeOptions:{color:'#22d3ee',weight:4}}
+  }
+});
+map.addControl(drawControl);
+
+map.on(L.Draw.Event.CREATED, e => {
+  if (e.layerType === 'polyline') {
+    if (line) drawnItems.removeLayer(line);
+    line = e.layer;
+    drawnItems.addLayer(line);
+    map.fitBounds(line.getBounds(), {padding:[20,20]});
+    updateStats();
+    updateBadges();
+  }
+});
+map.on('draw:edited', () => { updateStats(); updateBadges(); });
+
+// DOM elements
+const speedEl = document.getElementById('speedLimit');
+const autoFromSpeedEl = document.getElementById('autoFromSpeed');
+const spacingEl = document.getElementById('spacing');
+const bufferSpacingEl = document.getElementById('bufferSpacing');
+const scaleEl = document.getElementById('scale');
+const stationStepEl = document.getElementById('stationStep');
+const modeSingleEl = document.getElementById('modeSingle');
+const modeDoubleEl = document.getElementById('modeDouble');
+const chkDeleteEl = document.getElementById('chk-delete');
+
+// Collapsible sections
+document.querySelectorAll('.section-header').forEach(header => {
+  header.addEventListener('click', () => {
+    const section = header.getAttribute('data-section');
+    const content = document.querySelector(`.section-content[data-section="${section}"]`);
+    const icon = header.querySelector('.section-icon');
+    content.classList.toggle('collapsed');
+    icon.classList.toggle('collapsed');
+  });
+});
+
+// Mobile toggle
+document.getElementById('mobileToggle').addEventListener('click', () => {
+  document.getElementById('sidebar').classList.toggle('mobile-hidden');
+});
+
+// Set today's date
+document.getElementById('projectDate').value = new Date().toLocaleDateString();
+
+// Metrics
+let lastTaperSpacingFt = null;
+let lastBufferSpacingFt = null;
+let lastTaperCones = 0;
+let lastBufferCones = 0;
+
+// Speed-based calculations
+function getMutcdBufferSpacingFt(speed){
+  const s = Math.max(10, Math.min(85, +speed||0));
+  if (s <= 25) return 25;
+  if (s <= 60) return Math.round(s/5)*5;
+  return 65;
+}
+function getStationIntervalFt(speed){
+  return (+speed <= 35 ? 25 : 50);
+}
+function getAdvanceWarningDistance(speed){
+  const s = +speed || 0;
+  if (s <= 25) return 100;
+  if (s <= 35) return 350;
+  if (s <= 45) return 500;
+  if (s <= 55) return 750;
+  return 1000;
+}
+function handleSpeedChange(){
+  const s = +speedEl.value || 0;
+  if (autoFromSpeedEl.checked){
+    bufferSpacingEl.value = getMutcdBufferSpacingFt(s);
+    stationStepEl.value = getStationIntervalFt(s);
+  }
+  updateBadges();
+  updateStats();
+}
+speedEl.addEventListener('input', handleSpeedChange);
+autoFromSpeedEl.addEventListener('input', handleSpeedChange);
+modeSingleEl.addEventListener('input', () => { updateBadges(); updateStats(); });
+modeDoubleEl.addEventListener('input', () => { updateBadges(); updateStats(); });
+
+// Format helpers
+function fmtFt(ft){ return ft ? `${Math.round(ft).toLocaleString()} ft` : '—'; }
+function fmtCurrency(val){ return val ? `$${Math.round(val).toLocaleString()}` : '—'; }
+
+// Update statistics
+function updateStats(){
+  let buffer=0, totalLength=0;
+  if (line){
+    const gj = line.toGeoJSON();
+    const C = gj.geometry.coordinates;
+    totalLength = turf.length(gj, {units:'meters'})/FT_TO_M;
+    
+    if (C.length >= 2){
+      if (C.length > 2){
+        if (modeDoubleEl.checked && C.length >= 3){
+          if (C.length > 3){
+            const bufferCoords = C.slice(1, C.length-1);
+            if (bufferCoords.length >= 2){
+              const lsBuf = {type:'Feature', geometry:{type:'LineString', coordinates: bufferCoords}};
+              buffer = turf.length(lsBuf,{units:'meters'})/FT_TO_M;
+            }
+          }
+        } else {
+          const lsBuf = {type:'Feature', geometry:{type:'LineString', coordinates: C.slice(1)}};
+          buffer = turf.length(lsBuf,{units:'meters'})/FT_TO_M;
+        }
+      }
+    }
+  }
+  
+  const coneCount = coneLayer.getLayers().length;
+  const signCount = countSignItems();
+  const speed = +speedEl.value || 35;
+  const reqAdvWarning = getAdvanceWarningDistance(speed);
+  
+  document.getElementById('statProjectLength').innerHTML = `Project Length: <strong>${fmtFt(totalLength)}</strong>`;
+  document.getElementById('statBuffer').innerHTML = `Buffer: <strong>${fmtFt(buffer)}</strong>`;
+  document.getElementById('statCones').innerHTML = `Cones: <strong>${coneCount}</strong>`;
+  document.getElementById('statSigns').innerHTML = `Signs: <strong>${signCount}</strong>`;
+  document.getElementById('statAdvWarning').innerHTML = `Adv. Warning: <strong>${reqAdvWarning} ft</strong> required`;
+  document.getElementById('signCount').textContent = signCount;
+  
+  // Cost estimation
+  const coneCost = coneCount * DEVICE_COSTS['Cone'];
+  let signCost = 0;
+  const signCounts = getSignCounts();
+  for (const [name, count] of Object.entries(signCounts)){
+    signCost += count * (DEVICE_COSTS[name] || DEVICE_COSTS['default']);
+  }
+  const totalCost = coneCost + signCost;
+  document.getElementById('statEstCost').innerHTML = `Est. Cost: <strong>${fmtCurrency(totalCost)}</strong>`;
+}
+
+// Place cones
+function placeCones(){
+  if (!line){ alert('Draw the polyline first.'); return; }
+
+  coneLayer.clearLayers();
+  labelLayer.clearLayers();
+
+  const spacingFt = +spacingEl.value || 35;
+  const bufferSpacingFt = +bufferSpacingEl.value || spacingFt;
+  const scale = +scaleEl.value || 1;
+  const stationStep = +stationStepEl.value || 50;
+  const doubleTaper = modeDoubleEl.checked;
+
+  lastBufferSpacingFt = bufferSpacingFt;
+  lastTaperSpacingFt = null;
+  lastTaperCones = 0;
+  lastBufferCones = 0;
+
+  const gj = line.toGeoJSON();
+  const C = gj.geometry.coordinates;
+  if (C.length < 2){ alert('Polyline needs at least two points.'); return; }
+
+  function addCone(latlng, title){
+    const icon = L.divIcon({html:`<div class="cone" style="transform:translate(-8px,-20px) scale(${scale});"></div>`,iconSize:[0,0]});
+    const m = L.marker(latlng, {icon, title});
+    m.on('click', ()=>{ if (chkDeleteEl.checked) { coneLayer.removeLayer(m); updateStats(); } });
+    coneLayer.addLayer(m);
+  }
+
+  function placeTaper(ls, titlePrefix){
+    const Lm = turf.length(ls,{units:'meters'});
+    const Lft = Lm/FT_TO_M;
+    if (Lm <= 0) return;
+    const maxSpacingForFiveFt = Lft/4;
+    const useOverride = spacingFt > maxSpacingForFiveFt;
+    const spacingM = (useOverride ? (Lft/4) : spacingFt) * FT_TO_M;
+
+    let pts = [];
+    if (useOverride){
+      for (let i=0;i<5;i++){ pts.push(turf.along(ls, (i/4)*Lm,{units:'meters'})); }
+      lastTaperSpacingFt = maxSpacingForFiveFt;
+    } else {
+      const n = Math.floor(Lm/spacingM);
+      for (let i=0;i<=n;i++){
+        const d = Math.min(i*spacingM,Lm);
+        pts.push(turf.along(ls, d, {units:'meters'}));
+      }
+      if (pts.length < 5){
+        pts = [];
+        for (let i=0;i<5;i++){ pts.push(turf.along(ls, (i/4)*Lm, {units:'meters'})); }
+        lastTaperSpacingFt = maxSpacingForFiveFt;
+      } else {
+        lastTaperSpacingFt = spacingFt;
+      }
+    }
+    pts.forEach((pt, idx)=> addCone(L.latLng(pt.geometry.coordinates[1], pt.geometry.coordinates[0]), `${titlePrefix} ${idx+1}`));
+    lastTaperCones += pts.length;
+  }
+
+  function placeBuffer(coords){
+    const spacingM = bufferSpacingFt*FT_TO_M;
+    for (let i=0;i<coords.length-1;i++){
+      const seg = {type:'Feature', geometry:{type:'LineString', coordinates:[coords[i], coords[i+1]]}};
+      const Lm = turf.length(seg,{units:'meters'});
+      if (Lm <= 0) continue;
+      const n = Math.floor(Lm/spacingM);
+      for (let k=1;k<=n;k++){
+        const d = k*spacingM;
+        if (d >= Lm) break;
+        const pt = turf.along(seg, d, {units:'meters'});
+        addCone(L.latLng(pt.geometry.coordinates[1], pt.geometry.coordinates[0]), `Buffer ${i+1}-${k}`);
+        lastBufferCones++;
+      }
+    }
+  }
+
+  const lsA = {type:'Feature', geometry:{type:'LineString', coordinates:[C[0], C[1]]}};
+  placeTaper(lsA, 'Taper A');
+
+  if (C.length > 2){
+    if (doubleTaper && C.length >= 3){
+      const lsB = {type:'Feature', geometry:{type:'LineString', coordinates:[C[C.length-2], C[C.length-1]]}};
+      placeTaper(lsB, 'Taper B');
+      if (C.length > 3){
+        const bufferCoords = C.slice(1, C.length-1);
+        if (bufferCoords.length >= 2) placeBuffer(bufferCoords);
+      }
+    } else {
+      placeBuffer(C.slice(1));
+    }
+  }
+
+  // Station labels
+  const totalLenM = turf.length(gj, {units:'meters'});
+  for (let d=stationStep*FT_TO_M; d<totalLenM; d+=stationStep*FT_TO_M){
+    const pt = turf.along(gj, d, {units:'meters'});
+    const latlng = L.latLng(pt.geometry.coordinates[1], pt.geometry.coordinates[0]);
+    const lbl=L.divIcon({className:'',html:`<div class="station-label">${Math.round(d/FT_TO_M)} ft</div>`});
+    const m = L.marker(latlng,{icon:lbl});
+    m.on('click', ()=>{ if (chkDeleteEl.checked) { labelLayer.removeLayer(m); updateStats(); } });
+    labelLayer.addLayer(m);
+  }
+
+  updateStats();
+  updateBadges();
+}
+
+// Measure tool
+function toggleMeasure(){
+  measureMode = !measureMode;
+  const btn = document.getElementById('btn-measure');
+  if (measureMode){
+    btn.style.background = 'var(--success)';
+    btn.textContent = '✓ Measuring';
+    map.getContainer().style.cursor = 'crosshair';
+    measurePoints = [];
+  } else {
+    btn.style.background = '';
+    btn.textContent = '📏 Measure';
+    map.getContainer().style.cursor = '';
+    measureLayer.clearLayers();
+    measurePoints = [];
+  }
+}
+
+map.on('click', (e) => {
+  if (!measureMode) return;
+  measurePoints.push(e.latlng);
+  
+  if (measurePoints.length === 1){
+    L.circleMarker(e.latlng, {radius:5, color:'#22c55e', fillColor:'#22c55e', fillOpacity:1}).addTo(measureLayer);
+  } else if (measurePoints.length === 2){
+    const p1 = measurePoints[0];
+    const p2 = measurePoints[1];
+    const line = L.polyline([p1, p2], {color:'#22c55e', weight:3, dashArray:'5,5'}).addTo(measureLayer);
+    
+    const gj = {type:'Feature', geometry:{type:'LineString', coordinates:[[p1.lng, p1.lat], [p2.lng, p2.lat]]}};
+    const distM = turf.length(gj, {units:'meters'});
+    const distFt = distM / FT_TO_M;
+    
+    const midpoint = L.latLng((p1.lat + p2.lat)/2, (p1.lng + p2.lng)/2);
+    const lbl = L.divIcon({className:'', html:`<div class="measure-label">${Math.round(distFt)} ft</div>`});
+    L.marker(midpoint, {icon: lbl}).addTo(measureLayer);
+    
+    L.circleMarker(p2, {radius:5, color:'#22c55e', fillColor:'#22c55e', fillOpacity:1}).addTo(measureLayer);
+    
+    measurePoints = [];
+  }
+});
+
+// Barricade
+function createBarricade(centerLL, options={}){
+  let angle = options.angle || 0;
+  const lenM = 8 * FT_TO_M;
+  const widthM = 0.5 * FT_TO_M;
+
+  function build(center, angDeg){
+    function dest(from, distM, bearingDeg){
+      return turf.rhumbDestination(from, distM/1000, bearingDeg, {units:'kilometers'}).geometry.coordinates;
+    }
+    const centerPt = turf.point([center.lng, center.lat]);
+    const A = dest(centerPt,  lenM/2, angDeg);
+    const B = dest(centerPt, -lenM/2, angDeg);
+    const left = angDeg - 90, right = angDeg + 90;
+    const A_left  = dest(turf.point(A),  widthM/2, left);
+    const A_right = dest(turf.point(A),  widthM/2, right);
+    const B_left  = dest(turf.point(B),  widthM/2, left);
+    const B_right = dest(turf.point(B),  widthM/2, right);
+    const ring = [A_left, A_right, B_right, B_left, A_left];
+    return ring.map(c=>[c[1],c[0]]);
+  }
+
+  const ringLL = build(centerLL, angle);
+  const poly = L.polygon(ringLL, {color:'#111827', weight:2, fill:true, fillColor:'#f97316', fillOpacity:0.9}).addTo(signLayer);
+
+  const handle = L.marker(centerLL, {draggable:true, icon: L.divIcon({className:'', html:'<div class="handle">8ft</div>', iconSize:[0,0]})}).addTo(signLayer);
+  handle.on('dragend', ()=>{
+    const ll = handle.getLatLng();
+    poly.setLatLngs(build(ll, angle));
+  });
+
+  const rotIcon = L.divIcon({className:'', html:'<div class="rot-toolbar"><button class="rot-btn" data-d="-15">⟲ 15°</button><button class="rot-btn" data-d="15">⟳ 15°</button></div>'});
+  const toolbar = L.marker(centerLL, {icon: rotIcon, draggable:false}).addTo(signLayer);
+
+  function syncToolbar(){ toolbar.setLatLng(handle.getLatLng()); }
+  handle.on('drag', syncToolbar);
+  syncToolbar();
+
+  toolbar.on('click', (e)=>{
+    const target = e.originalEvent.target;
+    if (target && target.classList && target.classList.contains('rot-btn')){
+      const delta = parseFloat(target.getAttribute('data-d'));
+      angle = (angle + delta) % 360;
+      poly.setLatLngs(build(handle.getLatLng(), angle));
+    }
+  });
+
+  const del = ()=>{ if (chkDeleteEl.checked){ signLayer.removeLayer(poly); signLayer.removeLayer(handle); signLayer.removeLayer(toolbar); updateStats(); } };
+  poly.on('click', del); handle.on('click', del);
+
+  updateStats();
+}
+
+function countSignItems(){
+  let count = 0;
+  signLayer.eachLayer(l => {
+    if (l instanceof L.Marker){
+      const el = l.getElement && l.getElement();
+      if (el && (el.querySelector('.sign-pill') || el.querySelector('.flagger-icon') || el.querySelector('.arrow-board'))) count++;
+    } else if (l instanceof L.Polygon) count++;
+    else if (l instanceof L.Circle) count++;
+  });
+  return count;
+}
+
+function getSignCounts(){
+  const counts = {};
+  signLayer.eachLayer(l => {
+    if (l instanceof L.Marker){
+      const el = l.getElement && l.getElement();
+      if (el && el.querySelector('.sign-pill')){
+        const text = el.innerText.trim();
+        counts[text] = (counts[text]||0)+1;
+      } else if (el && el.querySelector('.flagger-icon')){
+        counts['FLAGGER'] = (counts['FLAGGER']||0)+1;
+      } else if (el && el.querySelector('.arrow-board')){
+        counts['ARROW BOARD'] = (counts['ARROW BOARD']||0)+1;
+      }
+    } else if (l instanceof L.Polygon){
+      counts['BARRICADE 8 FT'] = (counts['BARRICADE 8 FT']||0)+1;
+    } else if (l instanceof L.Circle){
+      counts['ADVANCE WARNING AREA'] = (counts['ADVANCE WARNING AREA']||0)+1;
+    }
+  });
+  return counts;
+}
+
+// Signs drag & drop
+let draggedSignText = null;
+document.getElementById('palette').addEventListener('dragstart', (e)=>{
+  const t = e.target.closest('.sign-pill');
+  if (!t) return;
+  draggedSignText = t.getAttribute('data-sign');
+  e.dataTransfer.setData('text/plain', draggedSignText);
+});
+document.getElementById('map').addEventListener('dragover', (e)=> e.preventDefault());
+document.getElementById('map').addEventListener('drop', (e)=>{
+  e.preventDefault();
+  const text = e.dataTransfer.getData('text/plain') || draggedSignText;
+  if (!text) return;
+  const rect = e.currentTarget.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  const y = e.clientY - rect.top;
+  const latlng = map.containerPointToLatLng([x,y]);
+
+  if (text === 'BARRICADE 8 FT'){
+    createBarricade(latlng, {angle:0});
+    return;
+  }
+
+  if (text === 'ARROW BOARD'){
+    const html = '<div class="arrow-board"><div class="arrow-segment"></div><div class="arrow-segment"></div><div class="arrow-segment"></div></div>';
+    const icon = L.divIcon({className:'', html, iconSize:[0,0]});
+    const m = L.marker(latlng, {icon, draggable:true});
+    m.on('click', ()=>{ if (chkDeleteEl.checked) { signLayer.removeLayer(m); updateStats(); } });
+    signLayer.addLayer(m);
+    updateStats();
+    return;
+  }
+
+  if (text === 'CHANGEABLE MESSAGE'){
+    const html = '<div style="background:#000;border:3px solid #f59e0b;padding:4px 8px;border-radius:4px;color:#f59e0b;font-weight:bold;font-size:10px;font-family:monospace">MESSAGE<br>SIGN</div>';
+    const icon = L.divIcon({className:'', html, iconSize:[0,0]});
+    const m = L.marker(latlng, {icon, draggable:true});
+    m.on('click', ()=>{ if (chkDeleteEl.checked) { signLayer.removeLayer(m); updateStats(); } });
+    signLayer.addLayer(m);
+    updateStats();
+    return;
+  }
+
+  if (text === 'FLAGGER'){
+    const scale = +scaleEl.value || 1;
+    const html = `
+      <div class="flagger-icon" style="display:flex;align-items:center;gap:6px;transform:scale(${scale});">
+        <div style="width:14px;height:14px;background:#ef4444;border:2px solid #fff;clip-path:polygon(30% 0,70% 0,100% 30%,100% 70%,70% 100%,30% 100%,0 70%,0 30%);box-shadow:0 0 0 1px #000"></div>
+        <div style="position:relative;width:2px;height:22px;background:#000;margin-left:-2px"></div>
+        <div style="width:10px;height:18px;background:#000;border-radius:2px;margin-left:6px;position:relative;">
+          <div style="position:absolute;top:-8px;left:2px;width:6px;height:6px;background:#000;border-radius:50%"></div>
+          <div style="position:absolute;top:6px;left:-6px;width:6px;height:2px;background:#000"></div>
+          <div style="position:absolute;top:6px;right:-6px;width:6px;height:2px;background:#000"></div>
+        </div>
+      </div>`;
+    const icon = L.divIcon({className:'', html, iconSize:[0,0]});
+    const m = L.marker(latlng, {icon, draggable:true});
+    m.on('click', ()=>{ if (chkDeleteEl.checked) { signLayer.removeLayer(m); updateStats(); } });
+    signLayer.addLayer(m);
+    updateStats();
+    return;
+  }
+
+  const icon = L.divIcon({className:'',html:`<div class="sign-pill" style="cursor:move">${text}</div>`});
+  const m = L.marker(latlng, {icon, draggable:true});
+
+  let circle = null;
+  if (text === 'ROAD WORK AHEAD'){
+    const speed = +speedEl.value || 35;
+    const radiusFt = getAdvanceWarningDistance(speed);
+    const radiusM = radiusFt * FT_TO_M;
+    circle = L.circle(latlng, {
+      radius: radiusM,
+      color:'#f97316',
+      fillColor:'#f97316',
+      fillOpacity:0.25,
+      weight:1
+    }).addTo(signLayer);
+    m._rwCircle = circle;
+    m.on('drag', () => {
+      if (m._rwCircle) m._rwCircle.setLatLng(m.getLatLng());
+    });
+  }
+
+  m.on('click', ()=>{ 
+    if (chkDeleteEl.checked) { 
+      if (m._rwCircle) signLayer.removeLayer(m._rwCircle);
+      signLayer.removeLayer(m); 
+      updateStats(); 
+    } 
+  });
+
+  signLayer.addLayer(m);
+  updateStats();
+});
+
+// MUTCD compliance
+function calcRequiredTaperLength(speed){
+  const s = +speed || 0;
+  if (s < 40) return (LANE_WIDTH_FT * s) / 60;
+  return (LANE_WIDTH_FT * (s * s)) / 60;
+}
+
+function createBadge(latlng, text, status, formulaText){
+  const className = status === 'good' ? '' : (status === 'warning' ? 'warning' : 'short');
+  const el = L.divIcon({className:'', html:`<div class="taper-badge ${className}">${text}</div>`});
+  const m = L.marker(latlng, {icon: el});
+  m.on('click', ()=>{
+    const color = status === 'good' ? '#22c55e' : (status === 'warning' ? '#f59e0b' : '#ef4444');
+    const symbol = status === 'good' ? '✓' : (status === 'warning' ? '⚠' : '✗');
+    const label = status === 'good' ? 'MUTCD Compliant' : (status === 'warning' ? 'Warning' : 'Not Compliant');
+    const popupText = `<div style="font-size:12px;">
+      <div style="font-weight:bold;color:${color}">${symbol} ${label}</div>
+      ${formulaText}
+    </div>`;
+    m.bindPopup(popupText, {className:'dark-popup', autoClose:true, closeOnClick:true}).openPopup();
+  });
+  return m;
+}
+
+function updateBadges(){
+  badgeLayer.clearLayers();
+  if (!line) {
+    document.getElementById('statTaperA').innerHTML = 'Taper A: —';
+    document.getElementById('statTaperB').innerHTML = 'Taper B: —';
+    return;
+  }
+  const speed = +speedEl.value || 0;
+  const required = calcRequiredTaperLength(speed);
+  const C = line.toGeoJSON().geometry.coordinates;
+  if (C.length < 2) return;
+
+  const segA = {type:'Feature', geometry:{type:'LineString', coordinates:[C[0],C[1]]}};
+  const LmA = turf.length(segA, {units:'meters'});
+  const LftA = LmA/FT_TO_M;
+  const midA = turf.along(segA, LmA/2, {units:'meters'});
+  const goodA = LftA >= required;
+  const warningA = LftA >= required * 0.9 && LftA < required;
+  const status = goodA ? 'good' : (warningA ? 'warning' : 'bad');
+  const diffA = Math.round(Math.abs(LftA - required));
+  const badgeTextA = goodA ? `✓ ${Math.round(LftA)} ft` : (warningA ? `⚠ ${Math.round(LftA)} ft` : `✗ Short ${diffA} ft`);
+  const formulaTextA = `<div>Required: ${Math.round(required)} ft<br>Actual: ${Math.round(LftA)} ft<br>W=12 ft, S=${speed} mph</div>`;
+  badgeLayer.addLayer(createBadge(L.latLng(midA.geometry.coordinates[1], midA.geometry.coordinates[0]), badgeTextA, status, formulaTextA));
+  document.getElementById('statTaperA').innerHTML = `Taper A: <strong>${Math.round(LftA)} ft</strong> ${goodA ? '(✓ MUTCD)' : warningA ? '(⚠ Close)' : '(✗ -' + diffA + ' ft)'}`;
+
+  if (modeDoubleEl.checked && C.length >= 3){
+    const segB = {type:'Feature', geometry:{type:'LineString', coordinates:[C[C.length-2], C[C.length-1]]}};
+    const LmB = turf.length(segB, {units:'meters'});
+    const LftB = LmB/FT_TO_M;
+    const midB = turf.along(segB, LmB/2, {units:'meters'});
+    const goodB = LftB >= required;
+    const warningB = LftB >= required * 0.9 && LftB < required;
+    const statusB = goodB ? 'good' : (warningB ? 'warning' : 'bad');
+    const diffB = Math.round(Math.abs(LftB - required));
+    const badgeTextB = goodB ? `✓ ${Math.round(LftB)} ft` : (warningB ? `⚠ ${Math.round(LftB)} ft` : `✗ Short ${diffB} ft`);
+    const formulaTextB = `<div>Required: ${Math.round(required)} ft<br>Actual: ${Math.round(LftB)} ft<br>W=12 ft, S=${speed} mph</div>`;
+    badgeLayer.addLayer(createBadge(L.latLng(midB.geometry.coordinates[1], midB.geometry.coordinates[0]), badgeTextB, statusB, formulaTextB));
+    document.getElementById('statTaperB').innerHTML = `Taper B: <strong>${Math.round(LftB)} ft</strong> ${goodB ? '(✓ MUTCD)' : warningB ? '(⚠ Close)' : '(✗ -' + diffB + ' ft)'}`;
+  } else {
+    document.getElementById('statTaperB').innerHTML = 'Taper B: —';
+  }
+}
+
+// Export functions
+function exportGeoJSON(){
+  const features = [];
+  if (line) features.push(line.toGeoJSON());
+  coneLayer.eachLayer(m => features.push({
+    type:'Feature', properties:{name:m.options.title||'Cone', type:'cone'},
+    geometry:{type:'Point', coordinates:[m.getLatLng().lng, m.getLatLng().lat]}
+  }));
+  labelLayer.eachLayer(m => {
+    const text = m.getElement() ? m.getElement().innerText : 'Station';
+    features.push({ type:'Feature', properties:{name:text, type:'label'},
+      geometry:{type:'Point', coordinates:[m.getLatLng().lng, m.getLatLng().lat]} });
+  });
+  signLayer.eachLayer(l => {
+    if (l instanceof L.Marker){
+      const el = l.getElement && l.getElement();
+      let name = 'Sign';
+      if (el && el.querySelector('.sign-pill')) name = el.innerText.trim();
+      else if (el && el.querySelector('.flagger-icon')) name = 'FLAGGER';
+      else if (el && el.querySelector('.arrow-board')) name = 'ARROW BOARD';
+      features.push({
+        type:'Feature', properties:{name, type:'sign'},
+        geometry:{type:'Point', coordinates:[l.getLatLng().lng, l.getLatLng().lat]}
+      });
+    } else if (l instanceof L.Polygon || l instanceof L.Polyline){
+      features.push(l.toGeoJSON());
+    } else if (l instanceof L.Circle){
+      const c = l.getLatLng();
+      features.push({
+        type:'Feature',
+        properties:{name:'ADVANCE WARNING', radius_m:l.getRadius(), type:'circle'},
+        geometry:{type:'Point', coordinates:[c.lng, c.lat]}
+      });
+    }
+  });
+  
+  const data = {
+    type:'FeatureCollection',
+    properties: {
+      project: document.getElementById('projectName').value || 'Untitled',
+      location: document.getElementById('projectLocation').value || '',
+      date: document.getElementById('projectDate').value || '',
+      speed: speedEl.value
+    },
+    features
+  };
+  
+  const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/geo+json'});
+  const a=document.createElement('a'); 
+  a.href=URL.createObjectURL(blob); 
+  a.download='work_zone.geojson'; 
+  a.click();
+}
+
+function exportKML(){
+  const features = [];
+  if (line) features.push(line.toGeoJSON());
+  coneLayer.eachLayer(m => features.push({
+    type:'Feature', properties:{name:m.options.title||'Cone'},
+    geometry:{type:'Point', coordinates:[m.getLatLng().lng, m.getLatLng().lat]}
+  }));
+  signLayer.eachLayer(l => {
+    if (l instanceof L.Marker){
+      const el = l.getElement && l.getElement();
+      let name = 'Sign';
+      if (el && el.querySelector('.sign-pill')) name = el.innerText.trim();
+      else if (el && el.querySelector('.flagger-icon')) name = 'FLAGGER';
+      else if (el && el.querySelector('.arrow-board')) name = 'ARROW BOARD';
+      features.push({
+        type:'Feature', properties:{name},
+        geometry:{type:'Point', coordinates:[l.getLatLng().lng, l.getLatLng().lat]}
+      });
+    }
+  });
+  const kml = tokml({type:'FeatureCollection', features}, {name:'name'});
+  const blob = new Blob([kml], {type:'application/vnd.google-earth.kml+xml'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='work_zone.kml'; a.click();
+}
+
+function exportCSV(){
+  let csv = 'Type,Name,Latitude,Longitude\n';
+  
+  coneLayer.eachLayer(m => {
+    const ll = m.getLatLng();
+    csv += `Cone,"${m.options.title||'Cone'}",${ll.lat},${ll.lng}\n`;
+  });
+  
+  signLayer.eachLayer(l => {
+    if (l instanceof L.Marker){
+      const ll = l.getLatLng();
+      const el = l.getElement && l.getElement();
+      let name = 'Sign';
+      if (el && el.querySelector('.sign-pill')) name = el.innerText.trim();
+      else if (el && el.querySelector('.flagger-icon')) name = 'FLAGGER';
+      else if (el && el.querySelector('.arrow-board')) name = 'ARROW BOARD';
+      csv += `Sign,"${name}",${ll.lat},${ll.lng}\n`;
+    }
+  });
+  
+  const blob = new Blob([csv], {type:'text/csv'});
+  const a=document.createElement('a'); 
+  a.href=URL.createObjectURL(blob); 
+  a.download='work_zone.csv'; 
+  a.click();
+}
+
+// Print
+function updatePrintPanel(){
+  document.getElementById('ppProjectName').textContent = document.getElementById('projectName').value || '—';
+  document.getElementById('ppLocation').textContent = document.getElementById('projectLocation').value || '—';
+  document.getElementById('ppDate').textContent = document.getElementById('projectDate').value || '—';
+  document.getElementById('ppSpeed').textContent = speedEl.value;
+  
+  const counts = getSignCounts();
+  const tbody = document.getElementById('printDevices');
+  tbody.innerHTML = '';
+  
+  // Add cones
+  const coneCount = coneLayer.getLayers().length;
+  if (coneCount > 0){
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>Traffic Cones</td><td><strong>${coneCount}</strong></td>`;
+    tbody.appendChild(tr);
+  }
+  
+  // Add signs
+  Object.keys(counts).sort().forEach(k => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${k}</td><td><strong>${counts[k]}</strong></td>`;
+    tbody.appendChild(tr);
+  });
+  
+  if (coneCount === 0 && Object.keys(counts).length === 0){
+    tbody.innerHTML = '<tr><td colspan="2">No devices placed</td></tr>';
+  }
+  
+  document.getElementById('ppTaperSpacing').textContent = lastTaperSpacingFt ? Math.round(lastTaperSpacingFt) + ' ft' : '—';
+  document.getElementById('ppTaperCones').textContent = lastTaperCones;
+  document.getElementById('ppBufferSpacing').textContent = lastBufferSpacingFt ? Math.round(lastBufferSpacingFt) + ' ft' : '—';
+  document.getElementById('ppBufferCones').textContent = lastBufferCones;
+  document.getElementById('ppTotalCones').textContent = coneCount;
+  
+  // Compliance summary
+  const compDiv = document.getElementById('ppCompliance');
+  const speed = +speedEl.value;
+  const required = calcRequiredTaperLength(speed);
+  let compHTML = `<div>Required taper length (${speed} mph): <strong>${Math.round(required)} ft</strong></div>`;
+  compHTML += `<div>Formula: L = WS/60 (speeds < 40 mph) or L = WS²/60 (speeds ≥ 40 mph)</div>`;
+  compHTML += `<div>Where W = lane width (12 ft), S = speed limit</div>`;
+  compDiv.innerHTML = compHTML;
+  
+  // Measurements
+  const measDiv = document.getElementById('ppMeasurements');
+  let totalLength = 0;
+  if (line){
+    totalLength = turf.length(line.toGeoJSON(), {units:'meters'})/FT_TO_M;
+  }
+  measDiv.innerHTML = `<div>Total project length: <strong>${fmtFt(totalLength)}</strong></div>`;
+  
+  // Generate QR code
+  generateQRCode();
+}
+
+function generatePlan(){
+  updatePrintPanel();
+  window.print();
+}
+
+// Button handlers
+document.getElementById('btn-place').addEventListener('click', placeCones);
+document.getElementById('btn-measure').addEventListener('click', toggleMeasure);
+document.getElementById('btn-clear-cones').addEventListener('click', ()=>{ coneLayer.clearLayers(); labelLayer.clearLayers(); updateStats(); });
+document.getElementById('btn-clear-signs').addEventListener('click', ()=>{ signLayer.clearLayers(); updateStats(); });
+document.getElementById('btn-clear-all').addEventListener('click', ()=>{ 
+  coneLayer.clearLayers(); 
+  labelLayer.clearLayers(); 
+  signLayer.clearLayers(); 
+  measureLayer.clearLayers();
+  if(line){drawnItems.removeLayer(line); line=null;} 
+  updateStats(); 
+  updateBadges(); 
+});
+document.getElementById('btn-export-geojson').addEventListener('click', exportGeoJSON);
+document.getElementById('btn-export-kml').addEventListener('click', exportKML);
+document.getElementById('btn-export-csv').addEventListener('click', exportCSV);
+document.getElementById('btn-print').addEventListener('click', generatePlan);
+document.getElementById('btn-preview-qr').addEventListener('click', showQRPreview);
+
+// QR Preview Modal
+function showQRPreview(){
+  if (coneLayer.getLayers().length === 0 && signLayer.getLayers().length === 0){
+    alert('Please place some cones and signs first before generating the QR code.');
+    return;
+  }
+  
+  const modal = document.getElementById('qrModal');
+  const qrContainer = document.getElementById('qrPreview');
+  qrContainer.innerHTML = '';
+  
+  const data = serializeWorkZone();
+  const json = JSON.stringify(data);
+  const encoded = btoa(json);
+  const baseUrl = window.location.href.split('#')[0].split('?')[0];
+  const fieldUrl = `${baseUrl}#field=${encoded}`;
+  
+  try {
+    new QRCode(qrContainer, {
+      text: fieldUrl,
+      width: 256,
+      height: 256,
+      colorDark: "#000000",
+      colorLight: "#ffffff",
+      correctLevel: QRCode.CorrectLevel.M
+    });
+    modal.classList.add('active');
+  } catch(e){
+    console.error('QR code generation error:', e);
+    alert('Error generating QR code. Please try again.');
+  }
+}
+
+document.getElementById('btnCloseModal').addEventListener('click', () => {
+  document.getElementById('qrModal').classList.remove('active');
+});
+
+document.getElementById('btnCopyUrl').addEventListener('click', () => {
+  const data = serializeWorkZone();
+  const json = JSON.stringify(data);
+  const encoded = btoa(json);
+  const baseUrl = window.location.href.split('#')[0].split('?')[0];
+  const fieldUrl = `${baseUrl}#field=${encoded}`;
+  
+  navigator.clipboard.writeText(fieldUrl).then(() => {
+    const btn = document.getElementById('btnCopyUrl');
+    const oldText = btn.textContent;
+    btn.textContent = '✓ Copied!';
+    setTimeout(() => {
+      btn.textContent = oldText;
+    }, 2000);
+  }).catch(() => {
+    alert('Could not copy URL. Please copy manually: ' + fieldUrl);
+  });
+});
+
+// Close modal on outside click
+document.getElementById('qrModal').addEventListener('click', (e) => {
+  if (e.target.id === 'qrModal'){
+    document.getElementById('qrModal').classList.remove('active');
+  }
+});
+
+[spacingEl, bufferSpacingEl, scaleEl, stationStepEl].forEach(el => el.addEventListener('input', updateStats));
+
+// ============== QR CODE & FIELD VIEW ==============
+
+// Check if we're loading in field view mode
+function checkFieldViewMode(){
+  const hash = window.location.hash;
+  if (hash.startsWith('#field=')){
+    try {
+      const data = hash.substring(7);
+      const decoded = atob(data);
+      const fieldData = JSON.parse(decoded);
+      initFieldView(fieldData);
+      return true;
+    } catch(e){
+      console.error('Error loading field data:', e);
+    }
+  }
+  return false;
+}
+
+// Serialize work zone data for QR code
+function serializeWorkZone(){
+  const devices = [];
+  
+  // Add cones
+  coneLayer.eachLayer(m => {
+    const ll = m.getLatLng();
+    devices.push({
+      type: 'cone',
+      name: m.options.title || 'Cone',
+      lat: ll.lat,
+      lng: ll.lng,
+      placed: false
+    });
+  });
+  
+  // Add signs
+  signLayer.eachLayer(l => {
+    if (l instanceof L.Marker){
+      const ll = l.getLatLng();
+      const el = l.getElement && l.getElement();
+      let name = 'Sign';
+      if (el && el.querySelector('.sign-pill')) name = el.innerText.trim();
+      else if (el && el.querySelector('.flagger-icon')) name = 'FLAGGER';
+      else if (el && el.querySelector('.arrow-board')) name = 'ARROW BOARD';
+      devices.push({
+        type: 'sign',
+        name: name,
+        lat: ll.lat,
+        lng: ll.lng,
+        placed: false
+      });
+    }
+  });
+  
+  // Get polyline coordinates if exists
+  let polylineCoords = null;
+  if (line){
+    const gj = line.toGeoJSON();
+    polylineCoords = gj.geometry.coordinates;
+  }
+  
+  return {
+    project: document.getElementById('projectName').value || 'Work Zone',
+    location: document.getElementById('projectLocation').value || '',
+    date: document.getElementById('projectDate').value || '',
+    speed: speedEl.value,
+    devices: devices,
+    polyline: polylineCoords,
+    timestamp: new Date().toISOString()
+  };
+}
+
+// Generate QR code for field view
+function generateQRCode(){
+  const qrContainer = document.getElementById('qrcode');
+  qrContainer.innerHTML = ''; // Clear previous
+  
+  if (coneLayer.getLayers().length === 0 && signLayer.getLayers().length === 0){
+    qrContainer.innerHTML = '<div style="color:#666;font-size:12px">No devices to display. Place cones and signs first.</div>';
+    return;
+  }
+  
+  const data = serializeWorkZone();
+  const json = JSON.stringify(data);
+  const encoded = btoa(json); // Base64 encode
+  
+  // Create URL with encoded data
+  const baseUrl = window.location.href.split('#')[0].split('?')[0];
+  const fieldUrl = `${baseUrl}#field=${encoded}`;
+  
+  // Generate QR code
+  try {
+    new QRCode(qrContainer, {
+      text: fieldUrl,
+      width: 200,
+      height: 200,
+      colorDark: "#000000",
+      colorLight: "#ffffff",
+      correctLevel: QRCode.CorrectLevel.M
+    });
+  } catch(e){
+    console.error('QR code generation error:', e);
+    qrContainer.innerHTML = '<div style="color:#ef4444">Error generating QR code</div>';
+  }
+}
+
+// Initialize field view
+let fieldMap = null;
+let fieldDevices = [];
+let currentDeviceIndex = 0;
+let userMarker = null;
+let gpsWatchId = null;
+let guidanceLine = null;
+let userHeading = 0;
+let lastArrivalAlert = 0;
+
+function initFieldView(data){
+  document.getElementById('fieldView').classList.add('active');
+  document.getElementById('app').style.display = 'none';
+  
+  // Set header info
+  document.getElementById('fieldProjectName').textContent = data.project;
+  document.getElementById('fieldProjectInfo').innerHTML = `
+    ${data.location ? data.location + ' • ' : ''}
+    ${data.date} • Speed: ${data.speed} mph • 
+    <strong>${data.devices.length} devices</strong>
+  `;
+  
+  fieldDevices = data.devices;
+  
+  // Initialize map
+  setTimeout(() => {
+    fieldMap = L.map('fieldViewMap', {
+      minZoom: 10,
+      maxZoom: 23,
+      zoomControl: true
+    }).setView([39.5, -98.35], 5);
+    
+    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+      attribution: 'Tiles © Esri',
+      maxZoom: 23
+    }).addTo(fieldMap);
+    
+    // Draw polyline if exists
+    if (data.polyline){
+      const coords = data.polyline.map(c => [c[1], c[0]]);
+      L.polyline(coords, {
+        color: '#22d3ee',
+        weight: 4,
+        opacity: 0.7
+      }).addTo(fieldMap);
+      
+      // Fit bounds to polyline
+      const bounds = L.latLngBounds(coords);
+      fieldMap.fitBounds(bounds, {padding: [50, 50]});
+    } else if (data.devices.length > 0){
+      // Fit to devices
+      const coords = data.devices.map(d => [d.lat, d.lng]);
+      const bounds = L.latLngBounds(coords);
+      fieldMap.fitBounds(bounds, {padding: [50, 50]});
+    }
+    
+    // Add device markers
+    data.devices.forEach((device, idx) => {
+      const isCone = device.type === 'cone';
+      const icon = L.divIcon({
+        className: '',
+        html: `<div class="placement-marker ${device.placed ? 'placed' : ''}" data-index="${idx}">
+          ${isCone ? '🚧' : '🚸'} ${device.name}
+        </div>`,
+        iconSize: [0, 0]
+      });
+      
+      const marker = L.marker([device.lat, device.lng], {icon});
+      
+      marker.on('click', () => {
+        showDevicePopup(marker, device, idx);
+      });
+      
+      marker.addTo(fieldMap);
+      device._marker = marker;
+    });
+    
+    // Auto-show first device
+    if (data.devices.length > 0){
+      focusDevice(0);
+    }
+  }, 100);
+  
+  // Setup controls
+  document.getElementById('btnLocateMe').addEventListener('click', startGPSTracking);
+  document.getElementById('btnNextDevice').addEventListener('click', nextDevice);
+  document.getElementById('btnExitField').addEventListener('click', () => {
+    stopGPSTracking();
+    window.location.hash = '';
+    window.location.reload();
+  });
+  
+  // Device orientation for compass (if available)
+  if (window.DeviceOrientationEvent){
+    window.addEventListener('deviceorientation', handleOrientation);
+  }
+}
+
+function showDevicePopup(marker, device, idx){
+  const distanceText = userMarker ? 
+    `<div style="margin:8px 0;padding:8px;background:rgba(34,197,94,0.1);border-radius:6px;border:1px solid #22c55e">
+      <div style="color:var(--success);font-weight:bold">📍 Distance: ${getDistanceToUser(device)} ft</div>
+    </div>` : '';
+  
+  const popup = `
+    <div class="device-popup">
+      <strong>${device.type === 'cone' ? '🚧 Cone' : '🚸 Sign'}: ${device.name}</strong>
+      <div class="coord">Lat: ${device.lat.toFixed(6)}<br>Lng: ${device.lng.toFixed(6)}</div>
+      ${distanceText}
+      <button onclick="markDevicePlaced(${idx})" style="margin-top:8px;width:100%;padding:8px;background:var(--success);border:none;border-radius:6px;font-weight:bold;cursor:pointer;font-size:13px">
+        ✓ Mark as Placed
+      </button>
+    </div>
+  `;
+  
+  marker.bindPopup(popup, {className: 'dark-popup'}).openPopup();
+}
+
+function focusDevice(idx){
+  if (idx < 0 || idx >= fieldDevices.length) return;
+  
+  currentDeviceIndex = idx;
+  const device = fieldDevices[idx];
+  
+  if (device._marker){
+    fieldMap.setView([device.lat, device.lng], 20, {animate: true});
+    showDevicePopup(device._marker, device, idx);
+    
+    // If GPS is active, navigation will auto-update
+    if (gpsWatchId !== null && userMarker){
+      const userLL = userMarker.getLatLng();
+      updateNavigation(userLL.lat, userLL.lng, 10);
+    }
+  }
+  
+  updateNextButton();
+}
+
+function nextDevice(){
+  // Find next unplaced device
+  let nextIdx = currentDeviceIndex + 1;
+  for (let i = 0; i < fieldDevices.length; i++){
+    const idx = (nextIdx + i) % fieldDevices.length;
+    if (!fieldDevices[idx].placed){
+      focusDevice(idx);
+      
+      // If GPS tracking is active, force navigation update
+      if (gpsWatchId !== null && userMarker){
+        const userLL = userMarker.getLatLng();
+        updateNavigation(userLL.lat, userLL.lng, 10);
+      }
+      return;
+    }
+  }
+  
+  // All placed
+  stopGPSTracking();
+  alert('✓ All devices have been placed! Great work!');
+}
+
+function updateNextButton(){
+  const remaining = fieldDevices.filter(d => !d.placed).length;
+  const btn = document.getElementById('btnNextDevice');
+  btn.innerHTML = remaining > 0 ? `→ Next (${remaining} left)` : '✓ All Placed';
+}
+
+// GPS Tracking and Navigation
+function startGPSTracking(){
+  if (!navigator.geolocation){
+    alert('Geolocation is not supported by your device');
+    return;
+  }
+  
+  const btn = document.getElementById('btnLocateMe');
+  
+  if (gpsWatchId !== null){
+    // Stop tracking
+    stopGPSTracking();
+    return;
+  }
+  
+  btn.style.background = 'var(--success)';
+  btn.textContent = '📍 GPS Active';
+  
+  // Show navigation UI
+  document.getElementById('navPanel').classList.remove('hidden');
+  document.getElementById('compassContainer').style.display = 'block';
+  
+  // Start continuous tracking
+  gpsWatchId = navigator.geolocation.watchPosition(
+    updateUserPosition,
+    handleGPSError,
+    {
+      enableHighAccuracy: true,
+      maximumAge: 1000,
+      timeout: 5000
+    }
+  );
+}
+
+function stopGPSTracking(){
+  if (gpsWatchId !== null){
+    navigator.geolocation.clearWatch(gpsWatchId);
+    gpsWatchId = null;
+  }
+  
+  const btn = document.getElementById('btnLocateMe');
+  btn.style.background = '';
+  btn.textContent = '📍 Start GPS';
+  
+  document.getElementById('navPanel').classList.add('hidden');
+  document.getElementById('compassContainer').style.display = 'none';
+  
+  if (guidanceLine){
+    fieldMap.removeLayer(guidanceLine);
+    guidanceLine = null;
+  }
+}
+
+function updateUserPosition(position){
+  const lat = position.coords.latitude;
+  const lng = position.coords.longitude;
+  const accuracy = position.coords.accuracy;
+  
+  // Update or create user marker
+  if (userMarker){
+    userMarker.setLatLng([lat, lng]);
+    if (userMarker._circle) userMarker._circle.setLatLng([lat, lng]).setRadius(accuracy);
+  } else {
+    // Accuracy circle
+    const circle = L.circle([lat, lng], {
+      radius: accuracy,
+      color: '#3b82f6',
+      fillColor: '#3b82f6',
+      fillOpacity: 0.15,
+      weight: 1
+    }).addTo(fieldMap);
+    
+    // User position marker
+    userMarker = L.circleMarker([lat, lng], {
+      radius: 10,
+      color: '#fff',
+      fillColor: '#3b82f6',
+      fillOpacity: 1,
+      weight: 3
+    }).addTo(fieldMap);
+    
+    userMarker._circle = circle;
+    userMarker.bindPopup('📍 Your Location');
+    
+    // Center on user first time
+    fieldMap.setView([lat, lng], 19, {animate: true});
+  }
+  
+  // Update navigation to current device
+  if (currentDeviceIndex >= 0 && currentDeviceIndex < fieldDevices.length){
+    updateNavigation(lat, lng, accuracy);
+  }
+  
+  // Update compass accuracy display
+  document.getElementById('compassAccuracy').textContent = 
+    accuracy < 10 ? 'High accuracy' : 
+    accuracy < 30 ? 'Good accuracy' : 
+    'Low accuracy';
+}
+
+function updateNavigation(userLat, userLng, accuracy){
+  const device = fieldDevices[currentDeviceIndex];
+  if (!device || device.placed) return;
+  
+  const userPt = turf.point([userLng, userLat]);
+  const devicePt = turf.point([device.lng, device.lat]);
+  
+  // Calculate distance
+  const distM = turf.distance(userPt, devicePt, {units: 'meters'});
+  const distFt = Math.round(distM / FT_TO_M);
+  
+  // Calculate bearing
+  const bearing = turf.bearing(userPt, devicePt);
+  
+  // Update navigation panel
+  updateNavigationPanel(distFt, bearing, device.name);
+  
+  // Update compass arrow
+  updateCompass(bearing);
+  
+  // Draw guidance line
+  drawGuidanceLine([userLat, userLng], [device.lat, device.lng]);
+  
+  // Check if arrived (within 10 feet)
+  if (distFt <= 10 && Date.now() - lastArrivalAlert > 5000){
+    showArrivalNotification(device.name);
+    lastArrivalAlert = Date.now();
+    
+    // Auto-open popup
+    if (device._marker){
+      showDevicePopup(device._marker, device, currentDeviceIndex);
+    }
+  }
+}
+
+function updateNavigationPanel(distFt, bearing, deviceName){
+  // Distance
+  const distEl = document.getElementById('navDistance');
+  if (distFt < 100){
+    distEl.textContent = `${distFt} ft`;
+  } else {
+    distEl.textContent = `${Math.round(distFt / 5) * 5} ft`;
+  }
+  
+  // Direction
+  const dirText = getDirectionText(bearing, distFt);
+  document.getElementById('navDirectionText').textContent = dirText.text;
+  document.getElementById('navArrowText').textContent = dirText.arrow;
+  
+  // Device name
+  document.getElementById('navDeviceName').textContent = deviceName;
+}
+
+function getDirectionText(bearing, distFt){
+  // Adjust bearing for device heading if available
+  let relativeBearing = bearing - userHeading;
+  if (relativeBearing < 0) relativeBearing += 360;
+  if (relativeBearing > 360) relativeBearing -= 360;
+  
+  // Cardinal directions
+  let cardinalDir = '';
+  if (relativeBearing >= 337.5 || relativeBearing < 22.5) cardinalDir = 'ahead';
+  else if (relativeBearing >= 22.5 && relativeBearing < 67.5) cardinalDir = 'ahead and right';
+  else if (relativeBearing >= 67.5 && relativeBearing < 112.5) cardinalDir = 'to your right';
+  else if (relativeBearing >= 112.5 && relativeBearing < 157.5) cardinalDir = 'behind and right';
+  else if (relativeBearing >= 157.5 && relativeBearing < 202.5) cardinalDir = 'behind you';
+  else if (relativeBearing >= 202.5 && relativeBearing < 247.5) cardinalDir = 'behind and left';
+  else if (relativeBearing >= 247.5 && relativeBearing < 292.5) cardinalDir = 'to your left';
+  else cardinalDir = 'ahead and left';
+  
+  // Arrow emoji
+  let arrow = '⬆️';
+  if (relativeBearing >= 22.5 && relativeBearing < 67.5) arrow = '↗️';
+  else if (relativeBearing >= 67.5 && relativeBearing < 112.5) arrow = '➡️';
+  else if (relativeBearing >= 112.5 && relativeBearing < 157.5) arrow = '↘️';
+  else if (relativeBearing >= 157.5 && relativeBearing < 202.5) arrow = '⬇️';
+  else if (relativeBearing >= 202.5 && relativeBearing < 247.5) arrow = '↙️';
+  else if (relativeBearing >= 247.5 && relativeBearing < 292.5) arrow = '⬅️';
+  else if (relativeBearing >= 292.5 && relativeBearing < 337.5) arrow = '↖️';
+  
+  // Distance-based text
+  let text = '';
+  if (distFt <= 10) text = 'You have arrived';
+  else if (distFt <= 30) text = `${cardinalDir}, ${distFt} feet`;
+  else if (distFt <= 100) text = `Continue ${cardinalDir}`;
+  else text = `Head ${cardinalDir}`;
+  
+  return {text, arrow};
+}
+
+function updateCompass(bearing){
+  const arrow = document.getElementById('compassArrow');
+  // Rotate arrow to point at target (accounting for device orientation)
+  const rotation = bearing - userHeading;
+  arrow.style.transform = `rotate(${rotation}deg)`;
+}
+
+function drawGuidanceLine(userCoords, deviceCoords){
+  if (guidanceLine){
+    fieldMap.removeLayer(guidanceLine);
+  }
+  
+  guidanceLine = L.polyline([userCoords, deviceCoords], {
+    color: '#22c55e',
+    weight: 3,
+    dashArray: '8,8',
+    opacity: 0.8,
+    className: 'guidance-line'
+  }).addTo(fieldMap);
+}
+
+function showArrivalNotification(deviceName){
+  const banner = document.createElement('div');
+  banner.className = 'arrival-banner';
+  banner.textContent = `✓ Arrived: ${deviceName}`;
+  document.getElementById('fieldViewMap').appendChild(banner);
+  
+  // Vibrate if supported
+  if (navigator.vibrate){
+    navigator.vibrate([200, 100, 200]);
+  }
+  
+  setTimeout(() => banner.remove(), 3000);
+}
+
+function handleGPSError(error){
+  console.error('GPS error:', error);
+  const btn = document.getElementById('btnLocateMe');
+  btn.style.background = 'var(--danger)';
+  btn.textContent = '⚠️ GPS Error';
+  
+  setTimeout(() => {
+    btn.style.background = '';
+    btn.textContent = '📍 Start GPS';
+  }, 3000);
+}
+
+function handleOrientation(event){
+  if (event.alpha !== null){
+    userHeading = event.alpha; // Device compass heading
+  }
+}
+
+function locateUser(){
+  // Fallback single location (for testing or if watch fails)
+  if (!navigator.geolocation){
+    alert('Geolocation is not supported by your device');
+    return;
+  }
+  
+  document.getElementById('btnLocateMe').textContent = '📍 Locating...';
+  
+  navigator.geolocation.getCurrentPosition(
+    (position) => {
+      updateUserPosition(position);
+    },
+    (error) => {
+      alert('Could not get your location: ' + error.message);
+      document.getElementById('btnLocateMe').textContent = '📍 My Location';
+    },
+    {
+      enableHighAccuracy: true,
+      timeout: 10000,
+      maximumAge: 0
+    }
+  );
+}
+
+function getDistanceToUser(device){
+  if (!userMarker) return '—';
+  
+  const userLL = userMarker.getLatLng();
+  const devicePt = turf.point([device.lng, device.lat]);
+  const userPt = turf.point([userLL.lng, userLL.lat]);
+  const distM = turf.distance(devicePt, userPt, {units: 'meters'});
+  const distFt = Math.round(distM / FT_TO_M);
+  
+  return distFt.toLocaleString();
+}
+
+// Make this global so popup button can call it
+window.markDevicePlaced = function(idx){
+  if (idx >= 0 && idx < fieldDevices.length){
+    fieldDevices[idx].placed = true;
+    
+    // Update marker appearance
+    if (fieldDevices[idx]._marker){
+      const el = fieldDevices[idx]._marker.getElement();
+      if (el){
+        const markerDiv = el.querySelector('.placement-marker');
+        if (markerDiv) markerDiv.classList.add('placed');
+      }
+      fieldDevices[idx]._marker.closePopup();
+    }
+    
+    updateNextButton();
+    
+    // Play success sound/vibration
+    if (navigator.vibrate){
+      navigator.vibrate(200);
+    }
+    
+    // Auto-advance to next after short delay
+    setTimeout(() => {
+      const remaining = fieldDevices.filter(d => !d.placed).length;
+      if (remaining > 0){
+        nextDevice();
+      } else {
+        // All done!
+        stopGPSTracking();
+        const banner = document.createElement('div');
+        banner.className = 'arrival-banner';
+        banner.innerHTML = '🎉 Work Zone Complete!<br><span style="font-size:14px">All devices placed</span>';
+        document.getElementById('fieldViewMap').appendChild(banner);
+        
+        if (navigator.vibrate){
+          navigator.vibrate([200, 100, 200, 100, 200]);
+        }
+        
+        setTimeout(() => banner.remove(), 5000);
+      }
+    }, 800);
+  }
+};
+
+// Check for field view mode on load
+if (!checkFieldViewMode()){
+  // Normal editor mode - initialize as before
+  updateStats();
+  updateBadges();
+}
+</script>
+</body>
+</html>
