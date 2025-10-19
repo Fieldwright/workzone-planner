@@ -138,6 +138,18 @@
   .field-header h2{margin:0 0 4px;font-size:18px;color:var(--accent)}
   .field-header .info{font-size:12px;color:var(--muted)}
   
+  /* Filter Buttons */
+  .filter-bar{display:flex;gap:6px;padding:10px;background:var(--panel);border-bottom:1px solid #374151;overflow-x:auto;flex-wrap:wrap}
+  .filter-btn{padding:6px 12px;border-radius:8px;border:2px solid #374151;background:#1f2937;color:var(--text);font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;transition:all 0.2s}
+  .filter-btn:hover{background:#374151}
+  .filter-btn.active{background:var(--accent);color:#000;border-color:var(--accent)}
+  .filter-btn.taper{border-color:#22c55e}
+  .filter-btn.taper.active{background:#22c55e}
+  .filter-btn.buffer{border-color:#f59e0b}
+  .filter-btn.buffer.active{background:#f59e0b}
+  .filter-btn.sign{border-color:#facc15}
+  .filter-btn.sign.active{background:#facc15}
+  
   /* Navigation Panel */
   .nav-panel{position:absolute;top:10px;left:10px;right:10px;background:rgba(17,24,39,0.95);border-radius:12px;padding:12px;z-index:1000;border:2px solid var(--accent);box-shadow:0 4px 12px rgba(0,0,0,0.5);backdrop-filter:blur(10px)}
   .nav-panel.hidden{display:none}
@@ -431,6 +443,15 @@
     <h2 id="fieldProjectName">Work Zone Setup</h2>
     <div class="info" id="fieldProjectInfo">Loading project information...</div>
   </div>
+  
+  <!-- Device Filter Bar -->
+  <div class="filter-bar">
+    <button class="filter-btn active" data-filter="all">🎯 All Devices</button>
+    <button class="filter-btn taper" data-filter="taper">🟢 Taper Cones</button>
+    <button class="filter-btn buffer" data-filter="buffer">🟠 Buffer Cones</button>
+    <button class="filter-btn sign" data-filter="sign">🟡 Signs</button>
+  </div>
+  
   <div id="fieldViewMap">
     <!-- Navigation Panel -->
     <div id="navPanel" class="nav-panel hidden">
@@ -470,6 +491,10 @@
       <div class="field-legend-item">
         <div class="field-legend-dot" style="background:#6b7280"></div>
         <span>Placed</span>
+      </div>
+      <div style="flex-basis:100%;text-align:center;font-size:10px;color:var(--muted);margin-top:4px">
+        💡 Use filter buttons above to focus on one device type at a time<br>
+        🔊 Audio alerts play when you arrive at each device (within 10 ft)
       </div>
     </div>
   </div>
@@ -1565,6 +1590,91 @@ let gpsWatchId = null;
 let guidanceLine = null;
 let userHeading = 0;
 let lastArrivalAlert = 0;
+let activeFilter = 'all'; // Current device filter
+let audioContext = null; // Audio context for sounds
+
+// Initialize Web Audio API for sounds
+function initAudio(){
+  if (!audioContext){
+    try {
+      audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    } catch(e){
+      console.log('Web Audio API not supported');
+    }
+  }
+}
+
+// Play arrival beep (three ascending tones)
+function playArrivalSound(){
+  if (!audioContext) return;
+  
+  const now = audioContext.currentTime;
+  const oscillator = audioContext.createOscillator();
+  const gainNode = audioContext.createGain();
+  
+  oscillator.connect(gainNode);
+  gainNode.connect(audioContext.destination);
+  
+  oscillator.type = 'sine';
+  
+  // Three quick beeps with ascending pitch
+  oscillator.frequency.setValueAtTime(800, now);
+  oscillator.frequency.setValueAtTime(1000, now + 0.15);
+  oscillator.frequency.setValueAtTime(1200, now + 0.3);
+  
+  gainNode.gain.setValueAtTime(0.3, now);
+  gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.5);
+  
+  oscillator.start(now);
+  oscillator.stop(now + 0.5);
+}
+
+// Play success sound (happy ascending tone)
+function playSuccessSound(){
+  if (!audioContext) return;
+  
+  const now = audioContext.currentTime;
+  const oscillator = audioContext.createOscillator();
+  const gainNode = audioContext.createGain();
+  
+  oscillator.connect(gainNode);
+  gainNode.connect(audioContext.destination);
+  
+  oscillator.type = 'triangle';
+  oscillator.frequency.setValueAtTime(600, now);
+  oscillator.frequency.exponentialRampToValueAtTime(800, now + 0.2);
+  
+  gainNode.gain.setValueAtTime(0.3, now);
+  gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
+  
+  oscillator.start(now);
+  oscillator.stop(now + 0.3);
+}
+
+// Play completion sound (victory fanfare)
+function playCompletionSound(){
+  if (!audioContext) return;
+  
+  const now = audioContext.currentTime;
+  
+  // Create three notes in a chord
+  [600, 800, 1000].forEach((freq, i) => {
+    const oscillator = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
+    
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+    
+    oscillator.type = 'sine';
+    oscillator.frequency.setValueAtTime(freq, now);
+    
+    gainNode.gain.setValueAtTime(0.2, now);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.8);
+    
+    oscillator.start(now + i * 0.1);
+    oscillator.stop(now + 0.8);
+  });
+}
 
 function initFieldView(data){
   document.getElementById('fieldView').classList.add('active');
@@ -1586,6 +1696,23 @@ function initFieldView(data){
   `;
   
   fieldDevices = devices;
+  
+  // Setup filter buttons
+  document.querySelectorAll('.filter-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      // Remove active from all
+      document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+      // Add active to clicked
+      btn.classList.add('active');
+      // Set filter
+      activeFilter = btn.getAttribute('data-filter');
+      // Update visibility and navigation
+      updateDeviceVisibility();
+      updateFilterInfo();
+      // Find first visible device
+      focusNextVisibleDevice();
+    });
+  });
   
   // Initialize map
   setTimeout(() => {
@@ -1690,6 +1817,66 @@ function initFieldView(data){
   }
 }
 
+// Device filtering functions
+function getDeviceCategory(device){
+  const deviceName = device.n || device.name || '';
+  const deviceType = device.t || device.type;
+  
+  if (deviceType === 's' || deviceType === 'sign') return 'sign';
+  
+  const nameLower = deviceName.toLowerCase();
+  if (nameLower.includes('taper')) return 'taper';
+  if (nameLower.includes('buffer')) return 'buffer';
+  
+  return 'cone'; // default for uncategorized cones
+}
+
+function isDeviceVisible(device){
+  if (activeFilter === 'all') return true;
+  return getDeviceCategory(device) === activeFilter;
+}
+
+function updateDeviceVisibility(){
+  fieldDevices.forEach(device => {
+    if (device._marker){
+      const visible = isDeviceVisible(device);
+      const el = device._marker.getElement();
+      if (el){
+        el.style.display = visible ? 'block' : 'none';
+      }
+    }
+  });
+}
+
+function updateFilterInfo(){
+  const visible = fieldDevices.filter(d => {
+    const placed = d.p !== undefined ? d.p : (d.placed || false);
+    return isDeviceVisible(d) && !placed;
+  }).length;
+  
+  const filterName = activeFilter === 'all' ? 'All Devices' : 
+                     activeFilter === 'taper' ? 'Taper Cones' :
+                     activeFilter === 'buffer' ? 'Buffer Cones' : 'Signs';
+  
+  document.getElementById('fieldProjectInfo').innerHTML = 
+    document.getElementById('fieldProjectInfo').innerHTML.split('<strong>')[0] + 
+    `<strong>${visible} ${filterName}</strong>`;
+}
+
+function focusNextVisibleDevice(){
+  // Find first unplaced visible device
+  for (let i = 0; i < fieldDevices.length; i++){
+    const device = fieldDevices[i];
+    const placed = device.p !== undefined ? device.p : (device.placed || false);
+    if (!placed && isDeviceVisible(device)){
+      focusDevice(i);
+      return;
+    }
+  }
+  // All visible devices placed
+  updateNextButton();
+}
+
 function showDevicePopup(marker, device, idx){
   // Handle both old and new format
   const deviceType = device.t || device.type;
@@ -1738,13 +1925,15 @@ function focusDevice(idx){
 }
 
 function nextDevice(){
-  // Find next unplaced device - handle both formats
+  // Find next unplaced visible device - handle both formats
   let nextIdx = currentDeviceIndex + 1;
   for (let i = 0; i < fieldDevices.length; i++){
     const idx = (nextIdx + i) % fieldDevices.length;
     const device = fieldDevices[idx];
     const placed = device.p !== undefined ? device.p : (device.placed || false);
-    if (!placed){
+    
+    // Check if device is visible based on current filter
+    if (!placed && isDeviceVisible(device)){
       focusDevice(idx);
       
       // If GPS tracking is active, force navigation update
@@ -1756,15 +1945,29 @@ function nextDevice(){
     }
   }
   
-  // All placed
-  stopGPSTracking();
-  alert('✓ All devices have been placed! Great work!');
+  // All visible devices placed
+  const totalRemaining = fieldDevices.filter(d => {
+    const placed = d.p !== undefined ? d.p : (d.placed || false);
+    return !placed;
+  }).length;
+  
+  if (totalRemaining > 0){
+    // Some devices left but in other categories
+    const filterName = activeFilter === 'taper' ? 'taper cones' :
+                       activeFilter === 'buffer' ? 'buffer cones' : 
+                       activeFilter === 'sign' ? 'signs' : 'devices';
+    alert(`✓ All ${filterName} placed! Switch filter to place remaining devices.`);
+  } else {
+    // Everything done
+    stopGPSTracking();
+    alert('✓ All devices have been placed! Great work!');
+  }
 }
 
 function updateNextButton(){
   const remaining = fieldDevices.filter(d => {
     const placed = d.p !== undefined ? d.p : (d.placed || false);
-    return !placed;
+    return !placed && isDeviceVisible(d);
   }).length;
   const btn = document.getElementById('btnNextDevice');
   btn.innerHTML = remaining > 0 ? `→ Next (${remaining} left)` : '✓ All Placed';
@@ -1784,6 +1987,9 @@ function startGPSTracking(){
     stopGPSTracking();
     return;
   }
+  
+  // Initialize audio on user interaction
+  initAudio();
   
   btn.style.background = 'var(--success)';
   btn.textContent = '📍 GPS Active';
@@ -1904,6 +2110,7 @@ function updateNavigation(userLat, userLng, accuracy){
   // Check if arrived (within 10 feet)
   if (distFt <= 10 && Date.now() - lastArrivalAlert > 5000){
     showArrivalNotification(deviceName);
+    playArrivalSound(); // Play audio notification
     lastArrivalAlert = Date.now();
     
     // Auto-open popup
@@ -2081,20 +2288,44 @@ window.markDevicePlaced = function(idx){
     }
     
     updateNextButton();
+    updateFilterInfo();
     
     // Play success sound/vibration
+    playSuccessSound();
     if (navigator.vibrate){
       navigator.vibrate(200);
     }
     
     // Auto-advance to next after short delay
     setTimeout(() => {
-      const remaining = fieldDevices.filter(d => {
+      const visibleRemaining = fieldDevices.filter(d => {
+        const placed = d.p !== undefined ? d.p : (d.placed || false);
+        return !placed && isDeviceVisible(d);
+      }).length;
+      
+      const totalRemaining = fieldDevices.filter(d => {
         const placed = d.p !== undefined ? d.p : (d.placed || false);
         return !placed;
       }).length;
-      if (remaining > 0){
+      
+      if (visibleRemaining > 0){
         nextDevice();
+      } else if (totalRemaining > 0){
+        // Current filter category done, but others remain
+        const filterName = activeFilter === 'taper' ? 'taper cones' :
+                           activeFilter === 'buffer' ? 'buffer cones' : 
+                           activeFilter === 'sign' ? 'signs' : 'devices in this category';
+        const banner = document.createElement('div');
+        banner.className = 'arrival-banner';
+        banner.innerHTML = `✓ All ${filterName} placed!<br><span style="font-size:14px">Switch filter for more</span>`;
+        document.getElementById('fieldViewMap').appendChild(banner);
+        
+        playSuccessSound();
+        if (navigator.vibrate){
+          navigator.vibrate([200, 100, 200]);
+        }
+        
+        setTimeout(() => banner.remove(), 3000);
       } else {
         // All done!
         stopGPSTracking();
@@ -2103,6 +2334,7 @@ window.markDevicePlaced = function(idx){
         banner.innerHTML = '🎉 Work Zone Complete!<br><span style="font-size:14px">All devices placed</span>';
         document.getElementById('fieldViewMap').appendChild(banner);
         
+        playCompletionSound();
         if (navigator.vibrate){
           navigator.vibrate([200, 100, 200, 100, 200]);
         }
