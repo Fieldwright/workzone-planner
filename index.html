@@ -394,7 +394,9 @@
         <span class="section-icon">▼</span>
       </div>
       <div class="section-content" data-section="project">
-        <label>Project Name</label>
+        <label>Prepared by</label>
+        <input id="preparedBy" type="text" placeholder="e.g., John Smith">
+        <label style="margin-top:6px">Project Name</label>
         <input id="projectName" type="text" placeholder="e.g., Main St Repairs">
         <label style="margin-top:6px">Location</label>
         <input id="projectLocation" type="text" placeholder="e.g., SR-123, Mile Marker 45">
@@ -614,6 +616,7 @@
 <div class="print-panel" id="printPanel">
   <h2>Traffic Management Plan</h2>
   <div style="margin-bottom:12px;font-size:13px">
+    <div><strong>Prepared by:</strong> <span id="ppPreparedBy">—</span></div>
     <div><strong>Project:</strong> <span id="ppProjectName">—</span></div>
     <div><strong>Location:</strong> <span id="ppLocation">—</span></div>
     <div><strong>Date:</strong> <span id="ppDate">—</span></div>
@@ -645,6 +648,18 @@
 
   <h3>Project Measurements</h3>
   <div id="ppMeasurements" style="font-size:12px"></div>
+
+  <h3>Work Zone Overview</h3>
+  <div style="text-align:center;margin:16px 0">
+    <img id="screenshot1" style="max-width:100%;height:auto;border:2px solid #000" />
+    <p style="font-size:11px;margin-top:4px;color:#666">Overview centered on work zone midpoint</p>
+  </div>
+
+  <h3>Full Work Zone Layout</h3>
+  <div style="text-align:center;margin:16px 0">
+    <img id="screenshot2" style="max-width:100%;height:auto;border:2px solid #000" />
+    <p style="font-size:11px;margin-top:4px;color:#666">Complete view from first taper to last cone</p>
+  </div>
 
   <div class="qr-section">
     <h3>📱 GPS-Guided Field Setup</h3>
@@ -2039,6 +2054,7 @@ function loadPhases() {
 }
 
 function updatePrintPanel(){
+  document.getElementById('ppPreparedBy').textContent = document.getElementById('preparedBy').value || '—';
   document.getElementById('ppProjectName').textContent = document.getElementById('projectName').value || '—';
   document.getElementById('ppLocation').textContent = document.getElementById('projectLocation').value || '—';
   document.getElementById('ppDate').textContent = document.getElementById('projectDate').value || '—';
@@ -2100,6 +2116,10 @@ function updatePrintPanel(){
     <div>Total project length: <strong>${fmtFt(totalLength)}</strong></div>
     <div>Advance warning distance: <strong>${getAdvanceWarningDistance(+speedEl.value)} ft</strong></div>
   `;
+  
+
+  // Generate screenshots for print
+  generateScreenshots();
   
   generateQRCode();
 }
@@ -2559,6 +2579,181 @@ function generateQRCode(){
     });
   });
   qrContainer.appendChild(urlDisplay);
+}
+
+function generateScreenshots(){
+  // Get all objects (cones and signs)
+  const allObjects = [];
+  
+  coneLayer.eachLayer(layer => {
+    if (layer.getLatLng) {
+      allObjects.push(layer.getLatLng());
+    }
+  });
+  
+  signLayer.eachLayer(layer => {
+    if (layer.getLatLng) {
+      allObjects.push(layer.getLatLng());
+    }
+  });
+  
+  if (allObjects.length < 2) {
+    document.getElementById('screenshot1').style.display = 'none';
+    document.getElementById('screenshot2').style.display = 'none';
+    return;
+  }
+  
+  // Calculate midpoint between two farthest objects
+  let maxDistance = 0;
+  let farthest1 = null;
+  let farthest2 = null;
+  
+  for (let i = 0; i < allObjects.length; i++) {
+    for (let j = i + 1; j < allObjects.length; j++) {
+      const distance = allObjects[i].distanceTo(allObjects[j]);
+      if (distance > maxDistance) {
+        maxDistance = distance;
+        farthest1 = allObjects[i];
+        farthest2 = allObjects[j];
+      }
+    }
+  }
+  
+  if (farthest1 && farthest2) {
+    const midLat = (farthest1.lat + farthest2.lat) / 2;
+    const midLng = (farthest1.lng + farthest2.lng) / 2;
+    const midpoint = L.latLng(midLat, midLng);
+    
+    // Calculate appropriate zoom to fit both points
+    const bounds = L.latLngBounds([farthest1, farthest2]);
+    
+    // Screenshot 1: Midpoint view
+    setTimeout(() => {
+      map.setView(midpoint, map.getBoundsZoom(bounds.pad(0.3)));
+      setTimeout(() => {
+        captureMapImage('screenshot1');
+      }, 500);
+    }, 100);
+  }
+  
+  // Screenshot 2: Full work zone from first taper to last cone
+  const taperCones = [];
+  coneLayer.eachLayer(layer => {
+    if (layer.getLatLng && layer.options.coneType === 'taper') {
+      taperCones.push(layer.getLatLng());
+    }
+  });
+  
+  const allCones = [];
+  coneLayer.eachLayer(layer => {
+    if (layer.getLatLng) {
+      allCones.push(layer.getLatLng());
+    }
+  });
+  
+  if (taperCones.length > 0 && allCones.length > 0) {
+    // Find first taper cone (assuming they're ordered)
+    const firstTaper = taperCones[0];
+    // Find last cone overall
+    const lastCone = allCones[allCones.length - 1];
+    
+    const fullBounds = L.latLngBounds([firstTaper, lastCone]);
+    
+    // Screenshot 2: Full view
+    setTimeout(() => {
+      map.fitBounds(fullBounds.pad(0.2));
+      setTimeout(() => {
+        captureMapImage('screenshot2');
+      }, 500);
+    }, 1500);
+  } else if (allCones.length > 1) {
+    // Fallback: use first and last cone
+    const fullBounds = L.latLngBounds([allCones[0], allCones[allCones.length - 1]]);
+    setTimeout(() => {
+      map.fitBounds(fullBounds.pad(0.2));
+      setTimeout(() => {
+        captureMapImage('screenshot2');
+      }, 500);
+    }, 1500);
+  }
+}
+
+function captureMapImage(targetId){
+  // Use leaflet-image or fallback to basic canvas capture
+  try {
+    // Get the map container
+    const mapContainer = map.getContainer();
+    const mapCanvas = document.createElement('canvas');
+    const ctx = mapCanvas.getContext('2d');
+    
+    // Set canvas size
+    const width = mapContainer.offsetWidth;
+    const height = mapContainer.offsetHeight;
+    mapCanvas.width = width;
+    mapCanvas.height = height;
+    
+    // Try to capture using html2canvas if available
+    if (typeof html2canvas !== 'undefined') {
+      html2canvas(mapContainer).then(canvas => {
+        document.getElementById(targetId).src = canvas.toDataURL('image/png');
+        document.getElementById(targetId).style.display = 'block';
+      }).catch(err => {
+        console.error('Screenshot error:', err);
+        document.getElementById(targetId).style.display = 'none';
+      });
+    } else {
+      // Fallback: try to get image data from tiles
+      const tiles = mapContainer.querySelectorAll('.leaflet-tile');
+      if (tiles.length > 0) {
+        // Draw tiles onto canvas
+        tiles.forEach(tile => {
+          if (tile.complete && tile.src) {
+            try {
+              const rect = tile.getBoundingClientRect();
+              const containerRect = mapContainer.getBoundingClientRect();
+              const x = rect.left - containerRect.left;
+              const y = rect.top - containerRect.top;
+              ctx.drawImage(tile, x, y, tile.width, tile.height);
+            } catch(e) {
+              console.log('Cannot draw tile due to CORS');
+            }
+          }
+        });
+        
+        // Try to add markers/polylines
+        const svgElements = mapContainer.querySelectorAll('svg');
+        svgElements.forEach(svg => {
+          try {
+            const serializer = new XMLSerializer();
+            const svgString = serializer.serializeToString(svg);
+            const img = new Image();
+            const svgBlob = new Blob([svgString], {type: 'image/svg+xml;charset=utf-8'});
+            const url = URL.createObjectURL(svgBlob);
+            img.onload = () => {
+              const rect = svg.getBoundingClientRect();
+              const containerRect = mapContainer.getBoundingClientRect();
+              const x = rect.left - containerRect.left;
+              const y = rect.top - containerRect.top;
+              ctx.drawImage(img, x, y, svg.width.baseVal.value, svg.height.baseVal.value);
+              URL.revokeObjectURL(url);
+            };
+            img.src = url;
+          } catch(e) {
+            console.log('Cannot draw SVG element');
+          }
+        });
+        
+        document.getElementById(targetId).src = mapCanvas.toDataURL('image/png');
+        document.getElementById(targetId).style.display = 'block';
+      } else {
+        // No tiles available, hide the image
+        document.getElementById(targetId).style.display = 'none';
+      }
+    }
+  } catch(e) {
+    console.error('Map capture error:', e);
+    document.getElementById(targetId).style.display = 'none';
+  }
 }
 
 function showQRPreview(){
@@ -3807,4 +4002,3 @@ if (!checkFieldViewMode()){
 </script>
 </body>
 </html>
-
