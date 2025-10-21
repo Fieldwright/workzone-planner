@@ -211,10 +211,12 @@
     .print-panel table{width:100%;border-collapse:collapse;margin:8px 0;font-size:12px}
     .print-panel th{background:#e5e7eb;padding:4px 8px;text-align:left;border:1px solid #000}
     .print-panel td{padding:4px 8px;border:1px solid #000}
-    .qr-section{margin-top:16px;padding:12px;border:2px solid #000;text-align:center;background:white}
+    .qr-section{margin-top:16px;padding:12px;border:2px solid #000;text-align:center;background:white;page-break-inside:avoid}
     .qr-section h3{margin-top:0}
-    .qr-section canvas{border:20px solid white !important;background:white;display:block !important;margin:10px auto !important}
-    .qr-section #qrcode{min-height:280px}
+    .qr-section canvas{border:20px solid white !important;background:white !important;display:block !important;margin:10px auto !important;max-width:300px !important;height:auto !important}
+    .qr-section #qrcode{min-height:280px;display:block !important}
+    .qr-url-display{display:none !important}
+    #screenshot1, #screenshot2{max-width:100% !important;height:auto !important;page-break-inside:avoid}
   }
 
   #fieldView{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:var(--bg);z-index:10000}
@@ -822,6 +824,7 @@
 <script src="https://unpkg.com/@turf/turf@6.5.0/turf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/tokml/0.4.0/tokml.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/qrious@4.0.2/dist/qrious.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/dom-to-image/2.6.0/dom-to-image.min.js"></script>
 
 <script>
 if ('serviceWorker' in navigator) {
@@ -2548,7 +2551,7 @@ function generateQRCode(){
     // Create QR code using QRious with higher error correction for better scanning
     const qr = new QRious({
       value: fieldUrl,
-      size: 200,
+      size: 300,
       level: 'H',
       background: 'white',
       foreground: 'black'
@@ -2560,6 +2563,8 @@ function generateQRCode(){
     qr.canvas.style.margin = '0 auto';
     qr.canvas.style.border = '20px solid white';
     qr.canvas.style.background = 'white';
+    qr.canvas.style.maxWidth = '100%';
+    qr.canvas.style.height = 'auto';
     
   } catch(e){
     console.error('QR code generation error:', e);
@@ -2568,6 +2573,7 @@ function generateQRCode(){
   
   // Also display the URL for manual entry with copy button
   const urlDisplay = document.createElement('div');
+  urlDisplay.className = 'qr-url-display';
   urlDisplay.style.cssText = 'margin-top:10px;padding:8px;background:#1e293b;border-radius:6px;word-break:break-all;font-size:10px;font-family:monospace;color:#60a5fa;max-height:100px;overflow-y:auto;cursor:pointer';
   urlDisplay.textContent = fieldUrl;
   urlDisplay.title = 'Click to copy URL';
@@ -2603,6 +2609,10 @@ function generateScreenshots(){
     return;
   }
   
+  // Store original map view to restore later
+  const originalZoom = map.getZoom();
+  const originalCenter = map.getCenter();
+  
   // Calculate midpoint between two farthest objects
   let maxDistance = 0;
   let farthest1 = null;
@@ -2619,141 +2629,106 @@ function generateScreenshots(){
     }
   }
   
+  // Screenshot 1: Midpoint between farthest objects
   if (farthest1 && farthest2) {
     const midLat = (farthest1.lat + farthest2.lat) / 2;
     const midLng = (farthest1.lng + farthest2.lng) / 2;
     const midpoint = L.latLng(midLat, midLng);
     
-    // Calculate appropriate zoom to fit both points
+    // Calculate zoom to show both farthest points nicely
     const bounds = L.latLngBounds([farthest1, farthest2]);
+    const zoom = map.getBoundsZoom(bounds.pad(0.4));
     
-    // Screenshot 1: Midpoint view
-    setTimeout(() => {
-      map.setView(midpoint, map.getBoundsZoom(bounds.pad(0.3)));
-      setTimeout(() => {
-        captureMapImage('screenshot1');
-      }, 500);
-    }, 100);
-  }
-  
-  // Screenshot 2: Full work zone from first taper to last cone
-  const taperCones = [];
-  coneLayer.eachLayer(layer => {
-    if (layer.getLatLng && layer.options.coneType === 'taper') {
-      taperCones.push(layer.getLatLng());
-    }
-  });
-  
-  const allCones = [];
-  coneLayer.eachLayer(layer => {
-    if (layer.getLatLng) {
-      allCones.push(layer.getLatLng());
-    }
-  });
-  
-  if (taperCones.length > 0 && allCones.length > 0) {
-    // Find first taper cone (assuming they're ordered)
-    const firstTaper = taperCones[0];
-    // Find last cone overall
-    const lastCone = allCones[allCones.length - 1];
+    // Set view and capture
+    map.setView(midpoint, zoom);
     
-    const fullBounds = L.latLngBounds([firstTaper, lastCone]);
-    
-    // Screenshot 2: Full view
     setTimeout(() => {
-      map.fitBounds(fullBounds.pad(0.2));
-      setTimeout(() => {
-        captureMapImage('screenshot2');
-      }, 500);
-    }, 1500);
-  } else if (allCones.length > 1) {
-    // Fallback: use first and last cone
-    const fullBounds = L.latLngBounds([allCones[0], allCones[allCones.length - 1]]);
-    setTimeout(() => {
-      map.fitBounds(fullBounds.pad(0.2));
-      setTimeout(() => {
-        captureMapImage('screenshot2');
-      }, 500);
-    }, 1500);
+      captureMapToImage('screenshot1', () => {
+        // Screenshot 2: Full work zone view
+        captureFullWorkZoneView(originalCenter, originalZoom);
+      });
+    }, 800);
   }
 }
 
-function captureMapImage(targetId){
-  // Use leaflet-image or fallback to basic canvas capture
-  try {
-    // Get the map container
-    const mapContainer = map.getContainer();
-    const mapCanvas = document.createElement('canvas');
-    const ctx = mapCanvas.getContext('2d');
-    
-    // Set canvas size
-    const width = mapContainer.offsetWidth;
-    const height = mapContainer.offsetHeight;
-    mapCanvas.width = width;
-    mapCanvas.height = height;
-    
-    // Try to capture using html2canvas if available
-    if (typeof html2canvas !== 'undefined') {
-      html2canvas(mapContainer).then(canvas => {
-        document.getElementById(targetId).src = canvas.toDataURL('image/png');
-        document.getElementById(targetId).style.display = 'block';
-      }).catch(err => {
-        console.error('Screenshot error:', err);
-        document.getElementById(targetId).style.display = 'none';
-      });
-    } else {
-      // Fallback: try to get image data from tiles
-      const tiles = mapContainer.querySelectorAll('.leaflet-tile');
-      if (tiles.length > 0) {
-        // Draw tiles onto canvas
-        tiles.forEach(tile => {
-          if (tile.complete && tile.src) {
-            try {
-              const rect = tile.getBoundingClientRect();
-              const containerRect = mapContainer.getBoundingClientRect();
-              const x = rect.left - containerRect.left;
-              const y = rect.top - containerRect.top;
-              ctx.drawImage(tile, x, y, tile.width, tile.height);
-            } catch(e) {
-              console.log('Cannot draw tile due to CORS');
-            }
-          }
-        });
-        
-        // Try to add markers/polylines
-        const svgElements = mapContainer.querySelectorAll('svg');
-        svgElements.forEach(svg => {
-          try {
-            const serializer = new XMLSerializer();
-            const svgString = serializer.serializeToString(svg);
-            const img = new Image();
-            const svgBlob = new Blob([svgString], {type: 'image/svg+xml;charset=utf-8'});
-            const url = URL.createObjectURL(svgBlob);
-            img.onload = () => {
-              const rect = svg.getBoundingClientRect();
-              const containerRect = mapContainer.getBoundingClientRect();
-              const x = rect.left - containerRect.left;
-              const y = rect.top - containerRect.top;
-              ctx.drawImage(img, x, y, svg.width.baseVal.value, svg.height.baseVal.value);
-              URL.revokeObjectURL(url);
-            };
-            img.src = url;
-          } catch(e) {
-            console.log('Cannot draw SVG element');
-          }
-        });
-        
-        document.getElementById(targetId).src = mapCanvas.toDataURL('image/png');
-        document.getElementById(targetId).style.display = 'block';
-      } else {
-        // No tiles available, hide the image
-        document.getElementById(targetId).style.display = 'none';
-      }
+function captureFullWorkZoneView(originalCenter, originalZoom) {
+  // Get all cones to find the full extent
+  const allCoords = [];
+  
+  coneLayer.eachLayer(layer => {
+    if (layer.getLatLng) {
+      allCoords.push(layer.getLatLng());
     }
-  } catch(e) {
-    console.error('Map capture error:', e);
-    document.getElementById(targetId).style.display = 'none';
+  });
+  
+  signLayer.eachLayer(layer => {
+    if (layer.getLatLng) {
+      allCoords.push(layer.getLatLng());
+    }
+  });
+  
+  if (line) {
+    line.getLatLngs().forEach(coord => allCoords.push(coord));
   }
+  
+  if (allCoords.length > 1) {
+    const fullBounds = L.latLngBounds(allCoords);
+    map.fitBounds(fullBounds.pad(0.3));
+    
+    setTimeout(() => {
+      captureMapToImage('screenshot2', () => {
+        // Restore original view
+        setTimeout(() => {
+          map.setView(originalCenter, originalZoom);
+        }, 300);
+      });
+    }, 800);
+  } else {
+    // Restore original view if no coordinates
+    map.setView(originalCenter, originalZoom);
+  }
+}
+
+function captureMapToImage(targetId, callback){
+  const imgElement = document.getElementById(targetId);
+  
+  if (!imgElement) {
+    console.error('Image element not found:', targetId);
+    if (callback) callback();
+    return;
+  }
+  
+  // Check if domtoimage is available
+  if (typeof domtoimage === 'undefined') {
+    console.error('dom-to-image library not loaded');
+    imgElement.style.display = 'none';
+    if (callback) callback();
+    return;
+  }
+  
+  const mapContainer = document.getElementById('map');
+  
+  // Capture the map using dom-to-image
+  domtoimage.toPng(mapContainer, {
+    quality: 0.95,
+    width: mapContainer.offsetWidth,
+    height: mapContainer.offsetHeight,
+    style: {
+      transform: 'scale(1)',
+      transformOrigin: 'top left'
+    }
+  })
+  .then(function (dataUrl) {
+    imgElement.src = dataUrl;
+    imgElement.style.display = 'block';
+    console.log('Screenshot captured for', targetId);
+    if (callback) callback();
+  })
+  .catch(function (error) {
+    console.error('Screenshot capture failed:', error);
+    imgElement.style.display = 'none';
+    if (callback) callback();
+  });
 }
 
 function showQRPreview(){
