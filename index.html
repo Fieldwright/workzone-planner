@@ -2542,7 +2542,7 @@ function generateQRCode(){
   const encoded = toUrlSafeBase64(json);
   
   const baseUrl = window.location.href.split('#')[0].split('?')[0];
-  const fieldUrl = `${baseUrl}?field=${encodeURIComponent(encoded)}`;
+  const fieldUrl = `${baseUrl}?field=${encoded}`;
   
   console.log('QR URL length:', fieldUrl.length);
   console.log('QR URL:', fieldUrl.substring(0, 100) + '...');
@@ -2751,7 +2751,7 @@ function showQRPreview(){
   const json = JSON.stringify(data);
   const encoded = toUrlSafeBase64(json);
   const baseUrl = window.location.href.split('#')[0].split('?')[0];
-  const fieldUrl = `${baseUrl}?field=${encodeURIComponent(encoded)}`;
+  const fieldUrl = `${baseUrl}?field=${encoded}`;
   
   console.log('Preview QR URL length:', fieldUrl.length);
   console.log('Data size:', json.length, 'bytes');
@@ -2903,7 +2903,7 @@ function checkFieldViewMode(){
   
   if (fieldParam) {
     try {
-      const decoded = fromUrlSafeBase64(decodeURIComponent(fieldParam));
+      const decoded = fromUrlSafeBase64(fieldParam);
       const fieldData = JSON.parse(decoded);
       console.log('Loading field view from query parameter');
       initFieldView(fieldData);
